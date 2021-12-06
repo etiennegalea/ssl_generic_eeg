@@ -62,7 +62,7 @@ n_jobs = 1
 from braindecode.datasets.sleep_physionet import SleepPhysionet
 
 dataset = SleepPhysionet(
-    subject_ids=[0, 1, 2], recording_ids=[1], crop_wake_mins=30)
+    subject_ids=[0, 1, 2], recording_ids=[1], crop_wake_mins=30, load_eeg_only=True)
 
 
 ######################################################################
