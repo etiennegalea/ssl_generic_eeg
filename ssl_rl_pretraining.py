@@ -44,11 +44,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from matplotlib import cm
-import umap.umap_ as umap
-import umap.plot
-
-from umap import UMAP
-import plotly.express as px
 
 # ----
 
@@ -68,30 +63,39 @@ high_cut_hz = 30
 
 # windowing
 window_size_s = 5
+window_size_samples = 500
 sfreq = 160
 
 # embedder
-emb_size = 100
+emb_size = 160
 
 # Training
 lr = 5e-3
 batch_size = 512
-n_epochs = 12
+n_epochs = 15
 num_workers = 0 if n_jobs <= 1 else n_jobs
 
 
 # ---
 
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+if device == 'cuda':
+    torch.backends.cudnn.benchmark = True
+# Set random seed to be able to reproduce results
+set_random_seeds(seed=random_state, cuda=device == 'cuda')
+
+print(f'device = {device}')
+
 
 # https://physionet.org/content/sleep-edfx/1.0.0/
 # Electrode locations Fpz-Cz, Pz-Oz
 
-
 dataset = SleepPhysionet(
     subject_ids=[
-        *range(0,5),
-        # *range(5,48),
-        # *range(49, 65)
+        #*range(0,5),
+        #*range(5,48),
+        #*range(49, 65),
+	*range(0,82)
     ],
     recording_ids=[1],
     crop_wake_mins=30,
@@ -109,7 +113,7 @@ preprocess(dataset, preprocessors)
 
 # Extracting windows
 
-window_size_samples = window_size_s * sfreq
+# window_size_samples = window_size_s * sfreq
 
 mapping = {  # We merge stages 3 and 4 following AASM standards.
     'Sleep stage W': 0,
