@@ -62,14 +62,15 @@ random_state = 87
 n_jobs = 1
 
 # Preprocessing
+sfreq = 160
 high_cut_hz = 30
 
 # windowing
-window_size_s = 5
-sfreq = 160
+window_size_samples = 500
 
 # embedder
-emb_size = 160
+n_channels, input_size_samples = 2, 500
+emb_size = 100
 
 # Training
 lr = 5e-3
@@ -87,7 +88,6 @@ if device == 'cuda':
 # Set random seed to be able to reproduce results
 set_random_seeds(seed=random_state, cuda=device == 'cuda')
 
-n_channels, input_size_samples = 2, 500
 
 # instantiate classes
 
@@ -224,20 +224,9 @@ eegmmidb = [mne.io.read_raw_edf(path, preload=True, stim_channel='auto', exclude
 # resample to 100Hz
 # high pass filtering of 30Hz
 
-sfreq = 160 # original
-high_cut_hz = 30
-n_jobs = 1
-
 for channel in eegmmidb:
     # mne.io.Raw.resample(channel, sfreq)   # resample
     mne.io.Raw.filter(channel, l_freq=None, h_freq=high_cut_hz, n_jobs=n_jobs)    # high-pass filter
-
-
-window_size_samples = 500
-# mapping = {
-#     'Eyes closed': 0,
-#     'Eyes open': 1,
-# }
 
 eegmmidb_windows = create_from_mne_raw(
     eegmmidb,
@@ -251,11 +240,7 @@ eegmmidb_windows = create_from_mne_raw(
     # preload=True
 )
 
-
 ### Fine tune on Sleep staging SSL model
-
-# In[9]:
-
 
 # split by subject
 
@@ -304,8 +289,6 @@ if device == 'cuda':
     torch.backends.cudnn.benchmark = True
 # Set random seed to be able to reproduce results
 set_random_seeds(seed=random_state, cuda=device == 'cuda')
-
-print(f':: device = {device}')
 
 batch_size = 512
 num_workers = 1
