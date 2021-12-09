@@ -2,17 +2,19 @@
 # %pip install umap-learn[plot] pandas matplotlib datashader bokeh holoviews scikit-image colorcet
 
 # imports
+import os
+import importlib
+from datetime import datetime
 import pickle
 import numpy as np
-import mne
+import pandas as pd
 import matplotlib.pyplot as plt
 # %matplotlib inline
-import os
-import pandas as pd
 
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
+import mne
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
@@ -44,6 +46,16 @@ from sklearn.model_selection import train_test_split
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from matplotlib import cm
+
+# ----
+
+
+# classes
+from helper_funcs import HelperFuncs as hf
+from ContrastiveNet import *
+from RelativePositioningDataset import *
+from plot import Plot
+
 
 # ----
 
@@ -143,29 +155,6 @@ subj_train, subj_test = train_test_split(
 subj_valid, subj_test = train_test_split(
     subj_test, test_size=0.5, random_state=random_state)
 
-class RelativePositioningDataset(BaseConcatDataset):
-    """BaseConcatDataset with __getitem__ that expects 2 indices and a target.
-    """
-    def __init__(self, list_of_ds):
-        super().__init__(list_of_ds)
-        self.return_pair = True
-
-    def __getitem__(self, index):
-        if self.return_pair:
-            ind1, ind2, y = index
-            return (super().__getitem__(ind1)[0],
-                    super().__getitem__(ind2)[0]), y
-        else:
-            return super().__getitem__(index)
-
-    @property
-    def return_pair(self):
-        return self._return_pair
-
-    @return_pair.setter
-    def return_pair(self, value):
-        self._return_pair = value
-
 
 split_ids = {'train': subj_train, 'valid': subj_valid, 'test': subj_test}
 splitted = dict()
@@ -217,33 +206,6 @@ emb = SleepStagerChambon2018(
     apply_batch_norm=True
 )
 
-
-class ContrastiveNet(nn.Module):
-    """Contrastive module with linear layer on top of siamese embedder.
-
-    Parameters
-    ----------
-    emb : nn.Module
-        Embedder architecture.
-    emb_size : int
-        Output size of the embedder.
-    dropout : float
-        Dropout rate applied to the linear layer of the contrastive module.
-    """
-    def __init__(self, emb, emb_size, dropout=0.5):
-        super().__init__()
-        self.emb = emb
-        self.clf = nn.Sequential(
-            nn.Dropout(dropout),
-            nn.Linear(emb_size, 1)
-        )
-
-    def forward(self, x):
-        x1, x2 = x
-        z1, z2 = self.emb(x1), self.emb(x2)
-        return self.clf(torch.abs(z1 - z2)).flatten()
-
-
 model = ContrastiveNet(emb, emb_size).to(device)
 
 
@@ -287,38 +249,7 @@ os.remove('./params.pt')  # Delete parameters file
 
 ## Visualizing the results
 
-# Extract loss and balanced accuracy values for plotting from history object
-df = pd.DataFrame(clf.history.to_list())
-
-df['train_acc'] *= 100
-df['valid_acc'] *= 100
-
-ys1 = ['train_loss', 'valid_loss']
-ys2 = ['train_acc', 'valid_acc']
-styles = ['-', ':']
-markers = ['.', '.']
-
-plt.style.use('seaborn-talk')
-
-fig, ax1 = plt.subplots(figsize=(16, 6))
-ax2 = ax1.twinx()
-for y1, y2, style, marker in zip(ys1, ys2, styles, markers):
-    ax1.plot(df['epoch'], df[y1], ls=style, marker=marker, ms=7,
-             c='tab:blue', label=y1)
-    ax2.plot(df['epoch'], df[y2], ls=style, marker=marker, ms=7,
-             c='tab:orange', label=y2)
-
-ax1.tick_params(axis='y', labelcolor='tab:blue')
-ax1.set_ylabel('Loss', color='tab:blue')
-ax2.tick_params(axis='y', labelcolor='tab:orange')
-ax2.set_ylabel('Accuracy [%]', color='tab:orange')
-ax1.set_xlabel('Epoch')
-
-lines1, labels1 = ax1.get_legend_handles_labels()
-lines2, labels2 = ax2.get_legend_handles_labels()
-ax2.legend(lines1 + lines2, labels1 + labels2)
-
-plt.tight_layout()
+Plot.plot_acc(clf.history.to_list())
 
 
 # Switch to the test sampler
