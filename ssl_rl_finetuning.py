@@ -304,4 +304,5 @@ p = Plot()
 
 p.plot_UMAP(X, y, annotations)
 p.plot_UMAP_connectivity(X)
+p.plot_UMAP_connectivity(X, edge_bundling=True)
 p.plot_UMAP_3d(X, y)

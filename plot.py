@@ -97,13 +97,17 @@ class Plot:
 
     # UMAP plot with connectivity
     # https://umap-learn.readthedocs.io/en/latest/plotting.html
-    def plot_UMAP_connectivity(self, X):
-        mapping = UMAP(n_components=3, init='random').fit_transform(X)
+    def plot_UMAP_connectivity(self, X, edge_bundling=False):
+        title = 'UMAP_connectivity'
+        mapping = umap.UMAP(n_components=2, init='random').fit(X)
 
-        # fig = umap.plot.connectivity(mapping, show_points=True)
-        umap.plot.connectivity(mapping, edge_bundling='hammer') # decreased connectivity (more readable (prettier))
-
-        self._plot(plt, 'UMAP_connectivity')
+        if not edge_bundling:
+            umap.plot.connectivity(mapping, show_points=True)
+        else:
+            title += '_edge_bundled'
+            umap.plot.connectivity(mapping, edge_bundling='hammer') # bundles edges
+            
+        self._plot(plt, title)
 
 
     # 3D UMAP plot (plotly)
