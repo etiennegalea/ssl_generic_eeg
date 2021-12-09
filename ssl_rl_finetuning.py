@@ -76,6 +76,7 @@ sfreq = 160
 high_cut_hz = 30
 
 # windowing
+window_size_s = 5
 window_size_samples = 500
 
 # embedder
@@ -285,7 +286,7 @@ print(confusion_matrix(data['test'][1], test_y_pred))
 print(classification_report(data['test'][1], test_y_pred))
 
 # ### save fine-tuned model
-with open(f'models/{hf.get_datetime()}{dataset_name}_finetuned.pkl', 'wb+') as f:
+with open(f'models/finetuned/{hf.get_datetime()}_{dataset_name}_{window_size_s}s_windows_{len(subjects)}_subjects_{device}.pkl', 'wb+') as f:
     pickle.dump(clf_pipe, f)
 f.close()
 

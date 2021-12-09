@@ -258,7 +258,7 @@ print(classification_report(y_true, y_pred))
 
 
 ### Save model
-model_name = f'models/pretrained/sleep_staging_{window_size_s}s_windows_{len(subjects)}_subjects_cpu_{n_epochs}_epochs.model'
+model_name = f'models/pretrained/{hf.get_datetime()}_sleep_staging_{window_size_s}s_windows_{len(subjects)}_subjects_{device}_{n_epochs}_epochs.model'
 torch.save(model, model_name)
 
 print(f'Model trained ~ {os.path.dirname(os.path.abspath(__file__))}/{model_name}')

@@ -20,13 +20,12 @@ class Plot:
         self.show = show
 
     def _plot(self, figure, title):
-        dt = hf.get_datetime()
         # show fig
         if self.show:
             figure.show()
         # save fig
         if self.save:
-            figure.savefig(f'plots/{dt}.{title}.png')
+            figure.savefig(f'plots/{hf.get_datetime()}_{title}.png')
 
     # Extract loss and balanced accuracy values for plotting from history object
     def plot_acc(self, clf_history):
@@ -126,4 +125,4 @@ class Plot:
             height=850
         )
         fig_3d.update_traces(marker_size=3)
-        fig_3d.write_html(f'plots/{hf.get_datetime()}.UMAP_3d.html')
+        fig_3d.write_html(f'plots/{hf.get_datetime()}_UMAP_3d.html')
