@@ -2,16 +2,19 @@
 # %pip install umap-learn[plot] pandas matplotlib datashader bokeh holoviews scikit-image colorcet
 
 # imports
+import os
+import importlib
+from datetime import datetime
+import pickle
 import numpy as np
-import mne
+import pandas as pd
 import matplotlib.pyplot as plt
 # %matplotlib inline
-import os
-import pandas as pd
 
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
+import mne
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
@@ -51,6 +54,13 @@ import plotly.express as px
 
 # ----
 
+# classes
+from helper_funcs import HelperFuncs as hf
+from ContrastiveNet import *
+from RelativePositioningDataset import *
+from plot import Plot
+
+
 # Authors: Hubert Banville <hubert.jbanville@gmail.com>
 #
 # License: BSD (3-clause)
@@ -70,13 +80,20 @@ window_size_samples = 500
 
 # embedder
 n_channels, input_size_samples = 2, 500
-emb_size = 100
+emb_size = sfreq
 
 # Training
 lr = 5e-3
 batch_size = 512
 n_epochs = 12
 num_workers = 0 if n_jobs <= 1 else n_jobs
+
+# visualizations
+annotations = ['T0', 'T1', 'T2']
+
+# misc
+dataset_name = 'bci'
+
 
 
 ### Load model
@@ -101,75 +118,9 @@ emb = SleepStagerChambon2018(
     apply_batch_norm=True
 )
 
-
-class ContrastiveNet(nn.Module):
-    """Contrastive module with linear layer on top of siamese embedder.
-
-    Parameters
-    ----------
-    emb : nn.Module
-        Embedder architecture.
-    emb_size : int
-        Output size of the embedder.
-    dropout : float
-        Dropout rate applied to the linear layer of the contrastive module.
-    """
-    def __init__(self, emb, emb_size, dropout=0.5):
-        super().__init__()
-        self.emb = emb
-        self.clf = nn.Sequential(
-            nn.Dropout(dropout),
-            nn.Linear(emb_size, 1)
-        )
-
-    def forward(self, x):
-        x1, x2 = x
-        z1, z2 = self.emb(x1), self.emb(x2)
-        return self.clf(torch.abs(z1 - z2)).flatten()
-
-
-class RelativePositioningDataset(BaseConcatDataset):
-    """BaseConcatDataset with __getitem__ that expects 2 indices and a target.
-    """
-    def __init__(self, list_of_ds):
-        super().__init__(list_of_ds)
-        self.return_pair = True
-
-    def __getitem__(self, index):
-        if self.return_pair:
-            ind1, ind2, y = index
-            return (super().__getitem__(ind1)[0],
-                    super().__getitem__(ind2)[0]), y
-        else:
-            return super().__getitem__(index)
-
-    @property
-    def return_pair(self):
-        return self._return_pair
-
-    @return_pair.setter
-    def return_pair(self, value):
-        self._return_pair = value
-
-
 # load the model
+# model = ContrastiveNet(emb, emb_size).to(device) # init
 model = torch.load("models/pretrained/sleep_staging_5s_windows_75_subjects_cpu_15_epochs.model")
-
-
-
-def compare_models(model_1, model_2):
-    models_differ = 0
-    for key_item_1, key_item_2 in zip(model_1.state_dict().items(), model_2.state_dict().items()):
-        if torch.equal(key_item_1[1], key_item_2[1]):
-            pass
-        else:
-            models_differ += 1
-            if (key_item_1[0] == key_item_2[0]):
-                print('Mismtach found at', key_item_1[0])
-            else:
-                raise Exception
-    if models_differ == 0:
-        print('Models match perfectly! :)')
 
 # compare_models(model.emb, emb)
 
@@ -332,66 +283,22 @@ print('Results on test set:')
 print(confusion_matrix(data['test'][1], test_y_pred))
 print(classification_report(data['test'][1], test_y_pred))
 
+# ### save fine-tuned model
+with open(f'models/{hf.get_datetime()}{dataset_name}_finetuned.pkl', 'wb+') as f:
+    pickle.dump(clf_pipe, f)
+f.close()
+
+# ### load fine-tuned model
+# with open('clf_pipe.pkl', 'rb') as f:
+#     clf_pipe = pickle.load(f)
+# f.close()
 
 
-
-
-### Visualizing clusters ###
+### Visualizing clusterss
 
 X = np.concatenate([v[0] for k, v in data.items()])
 y = np.concatenate([v[1] for k, v in data.items()])
 
-_umap = umap.UMAP(n_neighbors=15)
-umap_components = _umap.fit_transform(X)
-
-components = [
-    # pca_components,
-    # tsne_components,
-    umap_components
-]
-components_titles = [
-    'UMAP'
- ]
-
-# SINGLE plot
-fig, ax = plt.subplots(1, figsize=(20,20))
-colors = cm.get_cmap('viridis', 5)(range(5))
-for i, stage in enumerate(['1', '2', '3']):
-    mask = y == i
-    ax.scatter(umap_components[mask, 0], umap_components[mask, 1], s=100, alpha=0.7, label=stage)
-ax.legend()
-
-ax.set_title(components_titles[0])
-
-plt.savefig('UMAP.png')
-
-
-# UMAP plot with connectivity
-# https://umap-learn.readthedocs.io/en/latest/plotting.html
-
-
-mapping = _umap.fit(X)
-
-# fig = umap.plot.connectivity(mapping, show_points=True)
-umap.plot.connectivity(mapping, edge_bundling='hammer') # decreased connectivity (more readable (prettier))
-
-plt.savefig('UMAP_connectivity.png')
-# plt.show()
-
-# 3D UMAP plot
-umap_3d = UMAP(n_components=3, init='random', random_state=0)
-proj_3d = umap_3d.fit_transform(X)
-series = pd.DataFrame(y, columns=['annots'])
-
-fig_3d = px.scatter_3d(
-    proj_3d, x=0, y=1, z=2,
-    color=series.annots, labels={'color': 'annots'}
-)
-
-fig_3d.update_layout(
-    autosize=False,
-    width=850,
-    height=850
-)
-fig_3d.update_traces(marker_size=3)
-# fig_3d.show()
+Plot.plot_UMAP(X, y, annotations)
+Plot.plot_UMAP_connectivity(X)
+Plot.plot_UMAP_3d(X, y)
