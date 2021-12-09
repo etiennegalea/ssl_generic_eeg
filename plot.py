@@ -19,22 +19,18 @@ class Plot:
         self.save = save
         self.show = show
 
-    def _plot(self, figure, title, plotly_3d=False):
+    def _plot(self, figure, title):
         dt = hf.get_datetime()
+        # show fig
+        if self.show:
+            figure.show()
         # save fig
         if self.save:
             figure.savefig(f'plots/{dt}.{title}.png')
 
-        # show fig
-        if not plotly_3d:
-            if self.show:
-                figure.show()
-        else:
-            if self.save:
-                figure.write_html(f'plots/{dt}.{title}.html')
-
     # Extract loss and balanced accuracy values for plotting from history object
     def plot_acc(self, clf_history):
+        print('plotting accuracy per epoch...')
         df = pd.DataFrame(clf_history)
 
         df['train_acc'] *= 100
@@ -70,6 +66,7 @@ class Plot:
 
 
     def plot_UMAP(self, X, y, annotations=['W', 'N1', 'N2', 'N3', 'R']):
+        print('plotting UMAP...')
         _umap = umap.UMAP(n_neighbors=15)
         umap_components = _umap.fit_transform(X)
 
@@ -98,6 +95,7 @@ class Plot:
     # UMAP plot with connectivity
     # https://umap-learn.readthedocs.io/en/latest/plotting.html
     def plot_UMAP_connectivity(self, X, edge_bundling=False):
+        print('plotting UMAP with connectivity...')
         title = 'UMAP_connectivity'
         mapping = umap.UMAP(n_components=2, init='random').fit(X)
 
@@ -112,6 +110,7 @@ class Plot:
 
     # 3D UMAP plot (plotly)
     def plot_UMAP_3d(self, X, y):
+        print('plotting 3D UMAP...')
         umap_3d = UMAP(n_components=3, init='random', random_state=0)
         proj_3d = umap_3d.fit_transform(X)
         series = pd.DataFrame(y, columns=['annots'])
@@ -127,5 +126,4 @@ class Plot:
             height=850
         )
         fig_3d.update_traces(marker_size=3)
-        
-        self._plot(fig_3d, 'UMAP_3d', plotly_3d=True)
+        fig_3d.write_html(f'plots/{hf.get_datetime()}.UMAP_3d.html')

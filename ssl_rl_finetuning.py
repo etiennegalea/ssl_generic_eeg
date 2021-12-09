@@ -93,6 +93,7 @@ annotations = ['T0', 'T1', 'T2']
 
 # misc
 dataset_name = 'bci'
+edge_bundling_plot = False
 
 
 
@@ -304,5 +305,6 @@ p = Plot()
 
 p.plot_UMAP(X, y, annotations)
 p.plot_UMAP_connectivity(X)
-p.plot_UMAP_connectivity(X, edge_bundling=True)
+if edge_bundling_plot:
+    p.plot_UMAP_connectivity(X, edge_bundling=True)
 p.plot_UMAP_3d(X, y)
