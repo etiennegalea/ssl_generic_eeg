@@ -303,5 +303,5 @@ y = np.concatenate([v[1] for k, v in data.items()])
 p = Plot()
 
 p.plot_UMAP(X, y, annotations)
-P.plot_UMAP_connectivity(X)
-P.plot_UMAP_3d(X, y)
+p.plot_UMAP_connectivity(X)
+p.plot_UMAP_3d(X, y)
