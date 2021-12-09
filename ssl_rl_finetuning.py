@@ -299,6 +299,9 @@ f.close()
 X = np.concatenate([v[0] for k, v in data.items()])
 y = np.concatenate([v[1] for k, v in data.items()])
 
-Plot.plot_UMAP(X, y, annotations)
-Plot.plot_UMAP_connectivity(X)
-Plot.plot_UMAP_3d(X, y)
+# init plotting object
+p = Plot()
+
+p.plot_UMAP(X, y, annotations)
+P.plot_UMAP_connectivity(X)
+P.plot_UMAP_3d(X, y)

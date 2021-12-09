@@ -1,5 +1,5 @@
 import torch
-import datetime
+from datetime import datetime
 class HelperFuncs():
 
     def __init__(self):
