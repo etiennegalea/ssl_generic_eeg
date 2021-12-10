@@ -34,3 +34,15 @@ class HelperFuncs():
 
     def get_datetime():
         return datetime.now().strftime("%Y_%m_%d__%H_%M_%S")
+
+    def enable_gpu():
+        # attempting to enable GPU processing
+        device = 'cpu'
+        if torch.cuda.is_available():
+            print(':: CUDA enabled - using GPU')
+            device = 'cuda'
+            torch.backends.cudnn.benchmark = True
+        else:
+            print(':: CUDA unavailable - using CPU')
+            
+        return device
