@@ -79,7 +79,7 @@ from plot import Plot
 
 # https://physionet.org/content/sleep-edfx/1.0.0/
 # Electrode locations Fpz-Cz, Pz-Oz
-def main(subject_size, random_state, n_jobs, window_size_s, high_cut_hz, sfreq, emb_size, lr, batch_size, n_epochs):
+def main(subject_size, random_state, n_jobs, window_size_s, high_cut_hz, low_cut_hz, sfreq, emb_size, lr, batch_size, n_epochs):
 
     # set number of workers for EEGClassifier to the same as n_jobs
     num_workers = n_jobs
@@ -96,6 +96,8 @@ def main(subject_size, random_state, n_jobs, window_size_s, high_cut_hz, sfreq, 
         recording_ids=[1],
         crop_wake_mins=30,
         load_eeg_only=True,
+        resample=160,
+        n_jobs=n_jobs
     )
 
     preprocessors = [
@@ -229,9 +231,11 @@ def main(subject_size, random_state, n_jobs, window_size_s, high_cut_hz, sfreq, 
     os.remove('./params.pt')  # Delete parameters file
 
 
-    ## Visualizing the results
+    metadata_string = f'sleep_staging_{window_size_s}s_windows_{len(subjects)}_subjects_{device}_{n_epochs}_epochs'
 
-    Plot.plot_acc(clf.history.to_list())
+    ## Visualizing the results
+    p = Plot(metadata_string)
+    p.plot_acc(clf.history.to_list())
 
 
     # Switch to the test sampler
@@ -244,7 +248,7 @@ def main(subject_size, random_state, n_jobs, window_size_s, high_cut_hz, sfreq, 
 
 
     ### Save model
-    model_name = f'models/pretrained/{hf.get_datetime()}_sleep_staging_{window_size_s}s_windows_{len(subjects)}_subjects_{device}_{n_epochs}_epochs.model'
+    model_name = f'models/pretrained/{hf.get_datetime()}_{metadata_string}.model'
     torch.save(model, model_name)
 
     print(f'Model trained ~ {os.path.dirname(os.path.abspath(__file__))}/{model_name}')
