@@ -87,17 +87,17 @@ def main(subject_size, random_state, n_jobs, window_size_s, high_cut_hz, low_cut
     subjects = {
         'sample': [*range(5)],
         'some': [*range(0,40)],
-        'all': [*range(0,48), *range(49, 65)],
+        'all': [*range(0,83)],
     }
 
 
     dataset = SleepPhysionet(
         subject_ids=subjects[subject_size],
-        recording_ids=[1],
+        # recording_ids=[1],
         crop_wake_mins=30,
         load_eeg_only=True,
-        resample=160,
-        n_jobs=n_jobs
+        # resample=160,
+        # n_jobs=n_jobs
     )
 
     preprocessors = [
