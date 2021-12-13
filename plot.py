@@ -15,9 +15,11 @@ from helper_funcs import HelperFuncs as hf
 
 class Plot:
     
-    def __init__(self, save=True, show=True):
+    def __init__(self, metadata_string, save=True, show=True):
         self.save = save
         self.show = show
+        self.metadata_string = metadata_string
+        self.date = hf.get_datetime(dateonly=True)
 
     def _plot(self, figure, title):
         # show fig
@@ -25,7 +27,7 @@ class Plot:
             figure.show()
         # save fig
         if self.save:
-            figure.savefig(f'plots/{hf.get_datetime()}_{title}.png')
+            figure.savefig(f'plots/{self.date}_{title}_{self.metadata_string}.png')
 
     # Extract loss and balanced accuracy values for plotting from history object
     def plot_acc(self, clf_history):
@@ -125,4 +127,4 @@ class Plot:
             height=850
         )
         fig_3d.update_traces(marker_size=3)
-        fig_3d.write_html(f'plots/{hf.get_datetime()}_UMAP_3d.html')
+        fig_3d.write_html(f'plots/{self.date}_UMAP_3d_{self.metadata_string}.html')
