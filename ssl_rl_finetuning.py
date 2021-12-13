@@ -59,15 +59,17 @@ from plot import Plot
 # License: BSD (3-clause)
 
 
+### Load model
 @click.command()
-@click.option('--dataset', default='bci', help='Dataset to be finetuned.')
+@click.option('--dataset_name', '--dataset', '-n', default='bci', help='Dataset to be finetuned.')
 @click.option('--subject_size', default=10, help='Number of subjects to be trained - max 82.')
 @click.option('--random_state', default=87, help='')
 @click.option('--n_jobs', default=1, help='')
+# @click.option('--num_workers', default=1, help='')  # same as n_jobs
 @click.option('--window_size_s', default=5, help='Window sizes in seconds.')
 @click.option('--window_size_samples', default=500, help='Window sizes in milliseconds.')
-@click.option('--high_cut_hz', default=30, help='High-pass filter frequency.')
-@click.option('--low_cut_hz', default=0, help='Low-pass filter frequency.')
+@click.option('--high_cut_hz', '--hfreq', '-h', default=30, help='High-pass filter frequency.')
+@click.option('--low_cut_hz', '--lfreq', '-l', default=0, help='Low-pass filter frequency.')
 @click.option('--sfreq', default=160, help='Sampling frequency of the input data.')
 @click.option('--emb_size', default=160, help='Embedding size of the model (should correspond to sampling frequency).')
 @click.option('--lr', default=5e-3, help='Learning rate of the pretrained model.')
@@ -77,40 +79,12 @@ from plot import Plot
 @click.option('--input_size_samples', default=500, help='Number of epochs while training the pretrained model.')
 @click.option('--edge_bundling_plot', default=False, help='Plot UMAP connectivity plot with edge bundling (takes a long time).')
 @click.option('--annotations', default=['T0', 'T1', 'T2'], help='Annotations for plotting.')
+@click.option('--show_plots', '--show', default=False, help='Show plots.')
 
 
-def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window_size_samples, high_cut_hz, sfreq, emb_size, lr, batch_size, n_epochs, n_channels, input_size_samples, edge_bundling_plot, annotations):
-    # ### INIT VARIABLES
-    # random_state = 87
-    # n_jobs = 1
-
-    # # Preprocessing
-    # sfreq = 160
-    # high_cut_hz = 30
-
-    # # windowing
-    # window_size_s = 5
-    # window_size_samples = 500
-
-    # # embedder
-    # n_channels, input_size_samples = 2, 500
-    # emb_size = sfreq
-
-    # # Training
-    # batch_size = 512
-    # num_workers = 0 if n_jobs <= 1 else n_jobs
-
-    # # visualizations
-    # annotations = ['T0', 'T1', 'T2']
-
-    # # misc
-    # dataset_name = 'bci'
-    # edge_bundling_plot = False
-
-
-
-    ### Load model
-
+def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window_size_samples, high_cut_hz, low_cut_hz, sfreq, emb_size, lr, batch_size, n_epochs, n_channels, input_size_samples, edge_bundling_plot, annotations, show_plots):
+    print('STARTING MAIN')
+    # set device to 'cuda' or 'cpu'
     device = hf.enable_cuda()
     # Set random seed to be able to reproduce results
     set_random_seeds(seed=random_state, cuda=device == 'cuda')
@@ -128,8 +102,8 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
         apply_batch_norm=True
     )
 
-    # load the model
-    # model = ContrastiveNet(emb, emb_size).to(device) # init
+    # load the pretrained model
+    # (load the best model)
     model = torch.load("models/pretrained/sleep_staging_5s_windows_75_subjects_cpu_15_epochs.model")
 
     # compare_models(model.emb, emb)
@@ -137,75 +111,14 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
 
     # DOWNSTREAM TASK - FINE TUNING
 
-    ''' ANNOTATIONS
-    T0 corresponds to rest
-    T1 corresponds to onset of motion (real or imagined) of
-        the left fist (in runs 3, 4, 7, 8, 11, and 12)
-        both fists (in runs 5, 6, 9, 10, 13, and 14)
-    T2 corresponds to onset of motion (real or imagined) of
-        the right fist (in runs 3, 4, 7, 8, 11, and 12)
-        both feet (in runs 5, 6, 9, 10, 13, and 14)
-    '''
-
-    subjects = range(subject_size)
-    event_codes = [
-        1, 2, # eyes open, eyes closed (baselines)
-        3, 4, 5,
-        6, 7, 8, 9, 
-        10, 11, 12, 13, 14
-    ]
-
-    physionet_paths, descriptions = [], []
-
-    for subject_id in subjects:
-        physionet_paths += [mne.datasets.eegbci.load_data(subject_id, event_codes, update_path=False)]
-        descriptions += [{"event_code": code, "subject": subject_id} for code in event_codes]
-
-    # flatten list of paths
-    physionet_paths = [x for sublist in physionet_paths for x in sublist]
-
-    # Select the same channels as sleep staging model
-    # exclude channels which are not in Sleep Staging dataset
-    # exclude = list(x for x in eegmmidb[0].ch_names if x not in ['Fpz.', 'Pz..'])
-    exclude = [
-        'Fc5.', 'Fc3.', 'Fc1.', 'Fcz.', 'Fc2.', 'Fc4.', 'Fc6.', 'C5..',
-        'C3..', 'C1..', 'Cz..', 'C2..', 'C4..', 'C6..', 'Cp5.', 'Cp3.',
-        'Cp1.', 'Cpz.', 'Cp2.', 'Cp4.', 'Cp6.', 'Fp1.', 'Fp2.', 'Af7.', 
-        'Af3.', 'Afz.', 'Af4.', 'Af8.', 'F7..', 'F5..', 'F3..', 'F1..', 
-        'Fz..', 'F2..', 'F4..', 'F6..', 'F8..', 'Ft7.', 'Ft8.', 'T7..', 
-        'T8..', 'T9..', 'T10.', 'Tp7.', 'Tp8.', 'P7..', 'P5..', 'P3..', 
-        'P1..', 'P2..', 'P4..', 'P6..', 'P8..', 'Po7.', 'Po3.', 'Poz.', 
-        'Po4.', 'Po8.', 'O1..', 'Oz..', 'O2..', 'Iz..']
-
-    # Load each of the files
-    eegmmidb = [mne.io.read_raw_edf(path, preload=True, stim_channel='auto', exclude=exclude) for path in physionet_paths]
-
-
-    ### preprocess
-    # resample to 100Hz
-    # high pass filtering of 30Hz
-
-    for channel in eegmmidb:
-        # mne.io.Raw.resample(channel, sfreq)   # resample
-        mne.io.Raw.filter(channel, l_freq=None, h_freq=high_cut_hz, n_jobs=n_jobs)    # high-pass filter
-
-    eegmmidb_windows = create_from_mne_raw(
-        eegmmidb,
-        trial_start_offset_samples=0,
-        trial_stop_offset_samples=0,
-        window_size_samples=window_size_samples,
-        window_stride_samples=window_size_samples,
-        drop_last_window=True,
-        descriptions=descriptions,
-        # mapping=mapping,
-        # preload=True
-    )
+    windowed_data = load_bci_data(subject_size, window_size_samples, high_cut_hz, n_jobs)
+    # windowed_data = load_raws(subject_size, window_size_samples, high_cut_hz, n_jobs)
 
     ### Fine tune on Sleep staging SSL model
 
     # split by subject
 
-    subjects = np.unique(eegmmidb_windows.description['subject'])
+    subjects = np.unique(windowed_data.description['subject'])
     subj_train, subj_test = train_test_split(
         subjects, test_size=0.4, random_state=random_state)
     subj_valid, subj_test = train_test_split(
@@ -216,7 +129,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
     splitted = dict()
     for name, values in split_ids.items():
         splitted[name] = RelativePositioningDataset(
-            [ds for ds in eegmmidb_windows.datasets
+            [ds for ds in windowed_data.datasets
                 if ds.description['subject'] in values])
 
 
@@ -239,20 +152,11 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
         random_state=random_state)
 
 
-    ###############################
-    # trying w/o sequential layer #
-    ###############################
-
+    ### trying w/o sequential layer
     # model.emb.return_feats = True
 
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    if device == 'cuda':
-        torch.backends.cudnn.benchmark = True
-    # Set random seed to be able to reproduce results
-    set_random_seeds(seed=random_state, cuda=device == 'cuda')
-
     batch_size = 512
-    num_workers = 1
+    num_workers = n_jobs
 
     # Extract features with the trained embedder
     data = dict()
@@ -293,8 +197,10 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
     print(confusion_matrix(data['test'][1], test_y_pred))
     print(classification_report(data['test'][1], test_y_pred))
 
+    metadata_string = f'{dataset_name}_{window_size_s}s_windows_{len(subjects)}_subjects_{device}'
+
     # ### save fine-tuned model
-    with open(f'models/finetuned/{hf.get_datetime()}_{dataset_name}_{window_size_s}s_windows_{len(subjects)}_subjects_{device}.pkl', 'wb+') as f:
+    with open(f'models/finetuned/{hf.get_datetime()}_{metadata_string}.pkl', 'wb+') as f:
         pickle.dump(clf_pipe, f)
     f.close()
 
@@ -310,13 +216,103 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
     y = np.concatenate([v[1] for k, v in data.items()])
 
     # init plotting object
-    p = Plot()
+    p = Plot(metadata_string, show=show_plots)
 
     p.plot_UMAP(X, y, annotations)
     p.plot_UMAP_connectivity(X)
     if edge_bundling_plot:
         p.plot_UMAP_connectivity(X, edge_bundling=True)
     p.plot_UMAP_3d(X, y)
+
+
+# load BCI data
+def load_bci_data(subject_size, window_size_samples, high_cut_hz, n_jobs):
+    print('LOADING BCI DATA')
+
+    ''' ANNOTATIONS
+    T0 corresponds to rest
+    T1 corresponds to onset of motion (real or imagined) of
+        the left fist (in runs 3, 4, 7, 8, 11, and 12)
+        both fists (in runs 5, 6, 9, 10, 13, and 14)
+    T2 corresponds to onset of motion (real or imagined) of
+        the right fist (in runs 3, 4, 7, 8, 11, and 12)
+        both feet (in runs 5, 6, 9, 10, 13, and 14)
+    '''
+
+    subjects = range(1, subject_size)
+    event_codes = [
+        1, 2, # eyes open, eyes closed (baselines)
+        3, 4, 5,
+        6, 7, 8, 9, 
+        10, 11, 12, 13, 14
+    ]
+
+    physionet_paths, descriptions = [], []
+
+    for subject_id in subjects:
+        physionet_paths += [mne.datasets.eegbci.load_data(subject_id, event_codes, update_path=False)]
+        descriptions += [{"event_code": code, "subject": subject_id} for code in event_codes]
+
+    # flatten list of paths
+    physionet_paths = [x for sublist in physionet_paths for x in sublist]
+
+    # Select the same channels as sleep staging model
+    # exclude channels which are not in Sleep Staging dataset
+    # exclude = list(x for x in eegmmidb[0].ch_names if x not in ['Fpz.', 'Pz..'])
+    exclude = [
+        'Fc5.', 'Fc3.', 'Fc1.', 'Fcz.', 'Fc2.', 'Fc4.', 'Fc6.', 'C5..',
+        'C3..', 'C1..', 'Cz..', 'C2..', 'C4..', 'C6..', 'Cp5.', 'Cp3.',
+        'Cp1.', 'Cpz.', 'Cp2.', 'Cp4.', 'Cp6.', 'Fp1.', 'Fp2.', 'Af7.', 
+        'Af3.', 'Afz.', 'Af4.', 'Af8.', 'F7..', 'F5..', 'F3..', 'F1..', 
+        'Fz..', 'F2..', 'F4..', 'F6..', 'F8..', 'Ft7.', 'Ft8.', 'T7..', 
+        'T8..', 'T9..', 'T10.', 'Tp7.', 'Tp8.', 'P7..', 'P5..', 'P3..', 
+        'P1..', 'P2..', 'P4..', 'P6..', 'P8..', 'Po7.', 'Po3.', 'Poz.', 
+        'Po4.', 'Po8.', 'O1..', 'Oz..', 'O2..', 'Iz..']
+
+    # Load each of the files
+    eegmmidb = [mne.io.read_raw_edf(path, preload=True, stim_channel='auto', exclude=exclude) for path in physionet_paths]
+
+
+    ### preprocess
+    # resample to 100Hz
+    # high pass filtering of 30Hz
+
+    for raw in eegmmidb:
+        # mne.io.Raw.resample(raw, sfreq)   # resample
+        mne.io.Raw.filter(raw, l_freq=None, h_freq=high_cut_hz, n_jobs=n_jobs)    # high-pass filter
+
+    eegmmidb_windows = create_from_mne_raw(
+        eegmmidb,
+        trial_start_offset_samples=0,
+        trial_stop_offset_samples=0,
+        window_size_samples=window_size_samples,
+        window_stride_samples=window_size_samples,
+        drop_last_window=True,
+        descriptions=descriptions,
+        # mapping=mapping,
+        # preload=True
+    )
+
+    return eegmmidb_windows
+
+def load_raws():
+    print('LOADING RAWS')
+    raw_set = [
+        '/home/maligan/mne_data/physionet-sleep-data/SC4012E0-PSG.edf'
+        '/home/maligan/mne_data/physionet-sleep-data/SC4451F0-PSG.edf'
+        '/home/maligan/mne_data/physionet-sleep-data/SC4441E0-PSG.edf'
+        '/home/maligan/mne_data/physionet-sleep-data/SC4431E0-PSG.edf'
+        '/home/maligan/mne_data/physionet-sleep-data/SC4421E0-PSG.edf'
+    ]
+
+    # load into raw array
+    raws = [mne.io.read_raw_edf(x) for x in raw_set]
+    # mne.io.RawArray(raws)
+
+    raw_windows = raws
+
+    return raw_windows
+
 
 
 if __name__ == '__main__':

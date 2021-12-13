@@ -38,7 +38,7 @@ class HelperFuncs():
         return dt.strftime("%Y_%m_%d") if dateonly else dt.strftime("%Y_%m_%d__%H_%M_%S")
 
     # attempting to enable GPU processing
-    def enable_gpu():
+    def enable_cuda():
         device = 'cpu'
         if torch.cuda.is_available():
             print(':: CUDA enabled - using GPU')

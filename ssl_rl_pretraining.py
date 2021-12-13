@@ -77,33 +77,12 @@ from plot import Plot
 @click.option('--n_epochs', default=12, help='Number of epochs while training the pretrained model.')
 
 
+# https://physionet.org/content/sleep-edfx/1.0.0/
+# Electrode locations Fpz-Cz, Pz-Oz
 def main(subject_size, random_state, n_jobs, window_size_s, high_cut_hz, sfreq, emb_size, lr, batch_size, n_epochs):
-    # ### INIT VARIABLES
-    # random_state = 87
-    # n_jobs = 1
 
-    # # Preprocessing
-    # high_cut_hz = 30
-
-    # # windowing
-    # window_size_s = 5
-    # sfreq = 160
-
-    # # embedder
-    # emb_size = sfreq
-
-    # # Training
-    # lr = 5e-3
-    # batch_size = 512
-    # n_epochs = 12
-    # num_workers = 0 if n_jobs <= 1 else n_jobs
-
-
-    # ---
-
-
-    # https://physionet.org/content/sleep-edfx/1.0.0/
-    # Electrode locations Fpz-Cz, Pz-Oz
+    # set number of workers for EEGClassifier to the same as n_jobs
+    num_workers = n_jobs
 
     subjects = {
         'sample': [*range(5)],

@@ -15,19 +15,19 @@ from helper_funcs import HelperFuncs as hf
 
 class Plot:
     
-    def __init__(self, metadata_string, save=True, show=True):
+    def __init__(self, metadata_string, save=True, show=False):
         self.save = save
         self.show = show
         self.metadata_string = metadata_string
         self.date = hf.get_datetime(dateonly=True)
 
     def _plot(self, figure, title):
-        # show fig
-        if self.show:
-            figure.show()
         # save fig
         if self.save:
             figure.savefig(f'plots/{self.date}_{title}_{self.metadata_string}.png')
+        # show fig
+        if self.show:
+            figure.show()
 
     # Extract loss and balanced accuracy values for plotting from history object
     def plot_acc(self, clf_history):
