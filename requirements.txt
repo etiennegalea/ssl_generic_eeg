@@ -6,7 +6,6 @@ h5py
 skorch
 joblib
 mne
-braindecode
 torch
 scikit-learn
 pooch
