@@ -4,9 +4,8 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib import cm
 
-import umap.umap_ as umap
 import umap.plot
-from umap import UMAP
+import umap.umap_ as UMAP
 import plotly.express as px
 from datetime import datetime
 

@@ -41,11 +41,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from matplotlib import cm
-import umap.umap_ as umap
-import umap.plot
-
-from umap import UMAP
-import plotly.express as px
 
 # ----
 
@@ -96,8 +91,8 @@ def main(subject_size, random_state, n_jobs, window_size_s, high_cut_hz, low_cut
         # recording_ids=[1],
         crop_wake_mins=30,
         load_eeg_only=True,
-        # resample=160,
-        # n_jobs=n_jobs
+        resample=160,
+        n_jobs=n_jobs
     )
 
     preprocessors = [
