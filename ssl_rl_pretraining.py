@@ -68,7 +68,7 @@ def load_windowed_data(preprocessed_data):
 
 
 @click.command()
-@click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (64)')
+@click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
 @click.option('--random_state', default=87, help='')
 @click.option('--n_jobs', default=1, help='')
 @click.option('--window_size_s', default=5, help='Window sizes in seconds.')
@@ -112,7 +112,7 @@ def main(subject_size, random_state, n_jobs, window_size_s, window_size_samples,
             recording_ids=[1],
             crop_wake_mins=30,
             load_eeg_only=True,
-            resample=160,
+            sfreq=100,
             n_jobs=n_jobs
         )
 
