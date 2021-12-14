@@ -109,7 +109,7 @@ def main(subject_size, random_state, n_jobs, window_size_s, window_size_samples,
     else:
         dataset = SleepPhysionet(
             subject_ids=subjects[subject_size],
-            # recording_ids=[1],
+            recording_ids=[1],
             crop_wake_mins=30,
             load_eeg_only=True,
             resample=160,

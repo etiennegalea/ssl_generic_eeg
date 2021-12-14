@@ -39,11 +39,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from matplotlib import cm
-import umap.umap_ as umap
-import umap.plot
-
-from umap import UMAP
-import plotly.express as px
 
 # ----
 
@@ -62,7 +57,7 @@ from plot import Plot
 ### Load model
 @click.command()
 @click.option('--dataset_name', '--dataset', '-n', default='bci', help='Dataset to be finetuned.')
-@click.option('--subject_size', default=10, help='Number of subjects to be trained - max 82.')
+@click.option('--subject_size', default=10, help='Number of subjects to be trained - max 110.')
 @click.option('--random_state', default=87, help='')
 @click.option('--n_jobs', default=1, help='')
 # @click.option('--num_workers', default=1, help='')  # same as n_jobs
@@ -104,7 +99,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
 
     # load the pretrained model
     # (load the best model)
-    model = torch.load("models/pretrained/2021_12_14__11_41_56_sleep_staging_5s_windows_5_subjects_cpu_12_epochs_160hz.model")
+    model = torch.load("models/pretrained/2021_12_14__13_34_36_sleep_staging_5s_windows_83_subjects_cpu_12_epochs_160hz.model")
 
     # compare_models(model.emb, emb)
 
@@ -239,7 +234,7 @@ def load_bci_data(subject_size, window_size_samples, high_cut_hz, n_jobs):
         both feet (in runs 5, 6, 9, 10, 13, and 14)
     '''
 
-    subjects = range(1, subject_size)
+    subjects = range(1, subject_size) # max 110
     event_codes = [
         1, 2, # eyes open, eyes closed (baselines)
         3, 4, 5,
@@ -289,6 +284,8 @@ def load_bci_data(subject_size, window_size_samples, high_cut_hz, n_jobs):
         window_stride_samples=window_size_samples,
         drop_last_window=True,
         descriptions=descriptions,
+	accepted_bads_ratio=0.5,
+	drop_bad_windows=True,
         # mapping=mapping,
         # preload=True
     )
