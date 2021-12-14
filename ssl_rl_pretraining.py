@@ -79,6 +79,10 @@ def main(subject_size, random_state, n_jobs, window_size_s, high_cut_hz, low_cut
     # set number of workers for EEGClassifier to the same as n_jobs
     num_workers = n_jobs
 
+    device = hf.enable_cuda()
+    # Set random seed to be able to reproduce results
+    set_random_seeds(seed=random_state, cuda=device == 'cuda')
+
     subjects = {
         'sample': [*range(5)],
         'some': [*range(0,40)],
@@ -127,6 +131,13 @@ def main(subject_size, random_state, n_jobs, window_size_s, high_cut_hz, low_cut
 
     preprocess(windows_dataset, [Preprocessor(zscore)])
 
+    metadata_string = f'sleep_staging_{window_size_s}s_windows_{len(subjects)}_subjects_{device}_{n_epochs}_epochs_{sfreq}hz'
+
+    # ### save fine-tuned model
+    with open(f'data/processed/{hf.get_datetime()}_{metadata_string}.pkl', 'wb+') as f:
+        pickle.dump(windows_dataset, f)
+    f.close()
+
 
     ### Splitting dataset into train, valid and test sets
 
@@ -166,10 +177,6 @@ def main(subject_size, random_state, n_jobs, window_size_s, high_cut_hz, low_cut
 
 
     ### Creating the model
-
-    device = hf.enable_cuda()
-    # Set random seed to be able to reproduce results
-    set_random_seeds(seed=random_state, cuda=device == 'cuda')
 
     # Extract number of channels and time steps from dataset
     n_channels, input_size_samples = windows_dataset[0][0].shape
@@ -224,9 +231,6 @@ def main(subject_size, random_state, n_jobs, window_size_s, high_cut_hz, low_cut
     clf.load_params(checkpoint=cp)  # Load the model with the lowest valid_loss
 
     os.remove('./params.pt')  # Delete parameters file
-
-
-    metadata_string = f'sleep_staging_{window_size_s}s_windows_{len(subjects)}_subjects_{device}_{n_epochs}_epochs'
 
     ## Visualizing the results
     p = Plot(metadata_string)

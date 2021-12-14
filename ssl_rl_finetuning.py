@@ -197,7 +197,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
     print(confusion_matrix(data['test'][1], test_y_pred))
     print(classification_report(data['test'][1], test_y_pred))
 
-    metadata_string = f'{dataset_name}_{window_size_s}s_windows_{len(subjects)}_subjects_{device}'
+    metadata_string = f'{dataset_name}_{window_size_s}s_windows_{len(subjects)}_subjects_{device}_{sfreq}hz'
 
     # ### save fine-tuned model
     with open(f'models/finetuned/{hf.get_datetime()}_{metadata_string}.pkl', 'wb+') as f:
