@@ -72,6 +72,7 @@ def load_windowed_data(preprocessed_data):
 @click.option('--random_state', default=87, help='')
 @click.option('--n_jobs', default=1, help='')
 @click.option('--window_size_s', default=5, help='Window sizes in seconds.')
+@click.option('--window_size_samples', default=500, help='Window sizes in milliseconds.')
 @click.option('--high_cut_hz', default=30, help='High-pass filter frequency.')
 @click.option('--low_cut_hz', default=0, help='Low-pass filter frequency.')
 @click.option('--sfreq', default=160, help='Sampling frequency of the input data.')
@@ -83,7 +84,7 @@ def load_windowed_data(preprocessed_data):
 
 # https://physionet.org/content/sleep-edfx/1.0.0/
 # Electrode locations Fpz-Cz, Pz-Oz
-def main(subject_size, random_state, n_jobs, window_size_s, high_cut_hz, low_cut_hz, sfreq, emb_size, lr, batch_size, n_epochs, preprocessed_data):
+def main(subject_size, random_state, n_jobs, window_size_s, window_size_samples, high_cut_hz, low_cut_hz, sfreq, emb_size, lr, batch_size, n_epochs, preprocessed_data):
 
     
     # set number of workers for EEGClassifier to the same as n_jobs
@@ -124,7 +125,6 @@ def main(subject_size, random_state, n_jobs, window_size_s, high_cut_hz, low_cut
         preprocess(dataset, preprocessors)
 
         # Extracting windows
-        window_size_samples = window_size_s * sfreq
 
         mapping = {  # We merge stages 3 and 4 following AASM standards.
             'Sleep stage W': 0,
