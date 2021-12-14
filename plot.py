@@ -63,6 +63,7 @@ class Plot:
 
         plt.tight_layout()
         self._plot(plt, 'train_loss_acc')
+        print(':: accuracy plot saved')
 
 
     def plot_UMAP(self, X, y, annotations=['W', 'N1', 'N2', 'N3', 'R']):
@@ -90,11 +91,12 @@ class Plot:
         ax.set_title(components_titles[0])
 
         self._plot(plt, 'UMAP')
+        print(':: UMAP saved')
 
 
     # UMAP plot with connectivity
     # https://umap-learn.readthedocs.io/en/latest/plotting.html
-    def plot_UMAP_connectivity(self, X, edge_bundling=False):
+    def plot_UMAP_connectivity(self, X, eaccuracy plot dge_bundling=False):
         print('plotting UMAP with connectivity...')
         title = 'UMAP_connectivity'
         mapping = umap.UMAP(n_components=2, init='random').fit(X)
@@ -106,6 +108,7 @@ class Plot:
             umap.plot.connectivity(mapping, edge_bundling='hammer') # bundles edges
             
         self._plot(plt, title)
+        print(':: UMAP w/ connectivity saved')
 
 
     # 3D UMAP plot (plotly)
@@ -127,3 +130,4 @@ class Plot:
         )
         fig_3d.update_traces(marker_size=3)
         fig_3d.write_html(f'plots/{self.date}_UMAP_3d_{self.metadata_string}.html')
+        print(':: 3d UMAP saved')

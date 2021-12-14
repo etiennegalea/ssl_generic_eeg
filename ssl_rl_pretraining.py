@@ -58,6 +58,15 @@ from plot import Plot
 #
 # License: BSD (3-clause)
 
+
+# load preprocessed windowed data from previous run
+def load_windowed_data(preprocessed_data):
+    with open(f'data/preprocessed/{preprocessed_data}', 'rb') as f:
+        windows_dataset = pickle.load(f)
+    f.close()
+    return windows_dataset
+
+
 @click.command()
 @click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (64)')
 @click.option('--random_state', default=87, help='')
@@ -70,12 +79,13 @@ from plot import Plot
 @click.option('--lr', default=5e-3, help='Learning rate of the pretrained model.')
 @click.option('--batch_size', default=512, help='Batch size of the pretrained model.')
 @click.option('--n_epochs', default=12, help='Number of epochs while training the pretrained model.')
-
+@click.option('--preprocessed_data', '-d', default=None, help='Preprocessed windowed data from previous run.')
 
 # https://physionet.org/content/sleep-edfx/1.0.0/
 # Electrode locations Fpz-Cz, Pz-Oz
-def main(subject_size, random_state, n_jobs, window_size_s, high_cut_hz, low_cut_hz, sfreq, emb_size, lr, batch_size, n_epochs):
+def main(subject_size, random_state, n_jobs, window_size_s, high_cut_hz, low_cut_hz, sfreq, emb_size, lr, batch_size, n_epochs, preprocessed_data):
 
+    
     # set number of workers for EEGClassifier to the same as n_jobs
     num_workers = n_jobs
 
@@ -84,60 +94,61 @@ def main(subject_size, random_state, n_jobs, window_size_s, high_cut_hz, low_cut
     set_random_seeds(seed=random_state, cuda=device == 'cuda')
 
     subjects = {
-        'sample': [*range(5)],
-        'some': [*range(0,40)],
-        'all': [*range(0,83)],
-    }
+            'sample': [*range(5)],
+            'some': [*range(0,40)],
+            'all': [*range(0,83)],
+        }
 
+    metadata_string = f'sleep_staging_{window_size_s}s_windows_{len(subjects[subject_size])}_subjects_{device}_{n_epochs}_epochs_{sfreq}hz'
 
-    dataset = SleepPhysionet(
-        subject_ids=subjects[subject_size],
-        # recording_ids=[1],
-        crop_wake_mins=30,
-        load_eeg_only=True,
-        resample=160,
-        n_jobs=n_jobs
-    )
+    # if no windowed_data is specified, download it and preprocess it
+    if load_windowed_data:
+        print(':: loading windowed dataset: ', preprocessed_data)
+        windows_dataset = load_windowed_data(preprocessed_data)
+    else:
+        dataset = SleepPhysionet(
+            subject_ids=subjects[subject_size],
+            # recording_ids=[1],
+            crop_wake_mins=30,
+            load_eeg_only=True,
+            resample=160,
+            n_jobs=n_jobs
+        )
 
-    preprocessors = [
-        Preprocessor(lambda x: x * 1e6), # convert to microvolts
-        Preprocessor('filter', l_freq=None, h_freq=high_cut_hz, n_jobs=n_jobs) # high pass filtering
-    ]
+        preprocessors = [
+            Preprocessor(lambda x: x * 1e6), # convert to microvolts
+            Preprocessor('filter', l_freq=None, h_freq=high_cut_hz, n_jobs=n_jobs) # high pass filtering
+        ]
 
-    # Transform the data
-    preprocess(dataset, preprocessors)
+        # Transform the data
+        preprocess(dataset, preprocessors)
 
+        # Extracting windows
+        window_size_samples = window_size_s * sfreq
 
-    # Extracting windows
+        mapping = {  # We merge stages 3 and 4 following AASM standards.
+            'Sleep stage W': 0,
+            'Sleep stage 1': 1,
+            'Sleep stage 2': 2,
+            'Sleep stage 3': 3,
+            'Sleep stage 4': 3,
+            'Sleep stage R': 4
+        }
 
-    window_size_samples = window_size_s * sfreq
+        windows_dataset = create_windows_from_events(
+            dataset, trial_start_offset_samples=0, trial_stop_offset_samples=0,
+            window_size_samples=window_size_samples,
+            window_stride_samples=window_size_samples, preload=True, mapping=mapping)
 
-    mapping = {  # We merge stages 3 and 4 following AASM standards.
-        'Sleep stage W': 0,
-        'Sleep stage 1': 1,
-        'Sleep stage 2': 2,
-        'Sleep stage 3': 3,
-        'Sleep stage 4': 3,
-        'Sleep stage R': 4
-    }
+        ### Preprocessing windows
+        preprocess(windows_dataset, [Preprocessor(zscore)])
 
-    windows_dataset = create_windows_from_events(
-        dataset, trial_start_offset_samples=0, trial_stop_offset_samples=0,
-        window_size_samples=window_size_samples,
-        window_stride_samples=window_size_samples, preload=True, mapping=mapping)
+        ### save fine-tuned model
+        with open(f'data/preprocessed/{hf.get_datetime()}_{metadata_string}.pkl', 'wb+') as f:
+            pickle.dump(windows_dataset, f)
+        f.close()
 
-
-    ### Preprocessing windows
-
-    preprocess(windows_dataset, [Preprocessor(zscore)])
-
-    metadata_string = f'sleep_staging_{window_size_s}s_windows_{len(subjects)}_subjects_{device}_{n_epochs}_epochs_{sfreq}hz'
-
-    # ### save fine-tuned model
-    with open(f'data/processed/{hf.get_datetime()}_{metadata_string}.pkl', 'wb+') as f:
-        pickle.dump(windows_dataset, f)
-    f.close()
-
+    print(':: Preprocessed windowed dataset loaded.')
 
     ### Splitting dataset into train, valid and test sets
 
