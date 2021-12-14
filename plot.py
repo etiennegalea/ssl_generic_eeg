@@ -96,7 +96,7 @@ class Plot:
 
     # UMAP plot with connectivity
     # https://umap-learn.readthedocs.io/en/latest/plotting.html
-    def plot_UMAP_connectivity(self, X, eaccuracy plot dge_bundling=False):
+    def plot_UMAP_connectivity(self, X, edge_bundling=False):
         print('plotting UMAP with connectivity...')
         title = 'UMAP_connectivity'
         mapping = umap.UMAP(n_components=2, init='random').fit(X)
