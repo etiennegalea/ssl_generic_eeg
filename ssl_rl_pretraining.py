@@ -13,7 +13,7 @@ import mne
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
-from braindecode.datasets.sleep_physionet import SleepPhysionet
+from braindecode.braindecode.datasets.sleep_physionet import SleepPhysionet
 from braindecode.datasets import BaseConcatDataset
 from braindecode.datautil.preprocess import preprocess, Preprocessor
 from braindecode.preprocessing.windowers import create_windows_from_events
