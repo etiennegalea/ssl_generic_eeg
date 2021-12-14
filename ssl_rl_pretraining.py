@@ -102,7 +102,7 @@ def main(subject_size, random_state, n_jobs, window_size_s, high_cut_hz, low_cut
     metadata_string = f'sleep_staging_{window_size_s}s_windows_{len(subjects[subject_size])}_subjects_{device}_{n_epochs}_epochs_{sfreq}hz'
 
     # if no windowed_data is specified, download it and preprocess it
-    if load_windowed_data:
+    if preprocessed_data is not None:
         print(':: loading windowed dataset: ', preprocessed_data)
         windows_dataset = load_windowed_data(preprocessed_data)
     else:
