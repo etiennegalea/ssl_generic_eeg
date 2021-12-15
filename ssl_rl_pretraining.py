@@ -13,7 +13,7 @@ import mne
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
-from braindecode.braindecode.datasets.sleep_physionet import SleepPhysionet
+from braindecode.datasets.sleep_physionet import SleepPhysionet
 from braindecode.datasets import BaseConcatDataset
 from braindecode.datautil.preprocess import preprocess, Preprocessor
 from braindecode.preprocessing.windowers import create_windows_from_events
@@ -64,6 +64,7 @@ def load_windowed_data(preprocessed_data):
     with open(f'data/preprocessed/{preprocessed_data}', 'rb') as f:
         windows_dataset = pickle.load(f)
     f.close()
+    print(':: Preprocessed windowed data loaded...')
     return windows_dataset
 
 
@@ -86,7 +87,8 @@ def load_windowed_data(preprocessed_data):
 # Electrode locations Fpz-Cz, Pz-Oz
 def main(subject_size, random_state, n_jobs, window_size_s, window_size_samples, high_cut_hz, low_cut_hz, sfreq, emb_size, lr, batch_size, n_epochs, preprocessed_data):
 
-    
+    emb_size = sfreq
+
     # set number of workers for EEGClassifier to the same as n_jobs
     num_workers = n_jobs
 
@@ -112,7 +114,7 @@ def main(subject_size, random_state, n_jobs, window_size_s, window_size_samples,
             recording_ids=[1],
             crop_wake_mins=30,
             load_eeg_only=True,
-            sfreq=100,
+            sfreq=sfreq,
             n_jobs=n_jobs
         )
 
@@ -147,8 +149,9 @@ def main(subject_size, random_state, n_jobs, window_size_s, window_size_samples,
         with open(f'data/preprocessed/{hf.get_datetime()}_{metadata_string}.pkl', 'wb+') as f:
             pickle.dump(windows_dataset, f)
         f.close()
+        print(':: Data loaded, preprocessed and windowed.')
 
-    print(':: Preprocessed windowed dataset loaded.')
+    print(':: starting training...')
 
     ### Splitting dataset into train, valid and test sets
 

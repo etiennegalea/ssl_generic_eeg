@@ -99,7 +99,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
 
     # load the pretrained model
     # (load the best model)
-    model = torch.load("models/pretrained/2021_12_14__16_43_36_sleep_staging_5s_windows_83_subjects_cpu_12_epochs_160hz.model")
+    model = torch.load("models/pretrained/2021_12_15__01_34_22_sleep_staging_5s_windows_5_subjects_cpu_12_epochs_160hz.model")
 
     # compare_models(model.emb, emb)
 

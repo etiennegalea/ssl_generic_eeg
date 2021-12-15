@@ -67,7 +67,7 @@ class Plot:
 
 
     def plot_UMAP(self, X, y, annotations=['W', 'N1', 'N2', 'N3', 'R']):
-        print('plotting UMAP...')
+        print(':: plotting UMAP...')
         _umap = umap.UMAP(n_neighbors=15)
         umap_components = _umap.fit_transform(X)
 
@@ -97,7 +97,7 @@ class Plot:
     # UMAP plot with connectivity
     # https://umap-learn.readthedocs.io/en/latest/plotting.html
     def plot_UMAP_connectivity(self, X, edge_bundling=False):
-        print('plotting UMAP with connectivity...')
+        print(':: plotting UMAP with connectivity...')
         title = 'UMAP_connectivity'
         mapping = umap.UMAP(n_components=2, init='random').fit(X)
 
@@ -113,7 +113,7 @@ class Plot:
 
     # 3D UMAP plot (plotly)
     def plot_UMAP_3d(self, X, y):
-        print('plotting 3D UMAP...')
+        print(':: plotting 3D UMAP...')
         umap_3d = UMAP(n_components=3, init='random', random_state=0)
         proj_3d = umap_3d.fit_transform(X)
         series = pd.DataFrame(y, columns=['annots'])
