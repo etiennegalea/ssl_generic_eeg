@@ -307,6 +307,9 @@ def load_bci_data(subject_size, window_size_samples, high_cut_hz, sfreq, n_jobs)
         # preload=True
     )
 
+    # channel-wise zscore normalization
+    preprocess(eegmmidb_windows, [Preprocessor(zscore)])
+
     return eegmmidb_windows
 
 def load_raws():
