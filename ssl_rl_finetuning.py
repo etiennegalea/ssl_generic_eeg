@@ -57,7 +57,7 @@ from plot import Plot
 ### Load model
 @click.command()
 @click.option('--dataset_name', '--dataset', '-n', default='bci', help='Dataset to be finetuned.')
-@click.option('--subject_size', nargs=2, default=[1,10], help='Number of subjects to be trained - max 110.')
+@click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
 @click.option('--random_state', default=87, help='')
 @click.option('--n_jobs', default=1, help='')
 # @click.option('--num_workers', default=1, help='')  # same as n_jobs
@@ -107,7 +107,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
 
     # DOWNSTREAM TASK - FINE TUNING)
     if load_feature_vectors is None:
-        windowed_data = load_bci_data(subject_size, window_size_samples, high_cut_hz, n_jobs)
+        windowed_data = load_bci_data(subject_size, window_size_samples, high_cut_hz,sfreq, n_jobs)
         # windowed_data = load_raws(subject_size, window_size_samples, high_cut_hz, n_jobs)
 
         ### Fine tune on Sleep staging SSL model
@@ -237,7 +237,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
 
 
 # load BCI data
-def load_bci_data(subject_size, window_size_samples, high_cut_hz, n_jobs):
+def load_bci_data(subject_size, window_size_samples, high_cut_hz, sfreq, n_jobs):
     print('LOADING BCI DATA')
 
     ''' ANNOTATIONS
@@ -249,7 +249,8 @@ def load_bci_data(subject_size, window_size_samples, high_cut_hz, n_jobs):
         the right fist (in runs 3, 4, 7, 8, 11, and 12)
         both feet (in runs 5, 6, 9, 10, 13, and 14)
     '''
-
+    print(subject_size)
+    print(type(subject_size))
     subjects = range(subject_size[0], subject_size[1]) # max 110
     event_codes = [
         1, 2, # eyes open, eyes closed (baselines)
@@ -285,11 +286,10 @@ def load_bci_data(subject_size, window_size_samples, high_cut_hz, n_jobs):
 
 
     ### preprocess
-    # resample to 100Hz
     # high pass filtering of 30Hz
 
     for raw in eegmmidb:
-        # mne.io.Raw.resample(raw, sfreq)   # resample
+        mne.io.Raw.resample(raw, sfreq)   # resample
         mne.io.Raw.filter(raw, l_freq=None, h_freq=high_cut_hz, n_jobs=n_jobs)    # high-pass filter
 
     eegmmidb_windows = create_from_mne_raw(
@@ -300,8 +300,9 @@ def load_bci_data(subject_size, window_size_samples, high_cut_hz, n_jobs):
         window_stride_samples=window_size_samples,
         drop_last_window=True,
         descriptions=descriptions,
-	accepted_bads_ratio=0.5,
-	drop_bad_windows=True,
+        accepted_bads_ratio=0.5,
+        drop_bad_windows=True,
+        on_missing='ignore',
         # mapping=mapping,
         # preload=True
     )
