@@ -6,6 +6,7 @@ from matplotlib import cm
 
 import umap.plot
 import umap.umap_ as UMAP
+from umap import UMAP
 import plotly.express as px
 from datetime import datetime
 
