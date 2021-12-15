@@ -75,9 +75,10 @@ from plot import Plot
 @click.option('--edge_bundling_plot', default=False, help='Plot UMAP connectivity plot with edge bundling (takes a long time).')
 @click.option('--annotations', default=['T0', 'T1', 'T2'], help='Annotations for plotting.')
 @click.option('--show_plots', '--show', default=False, help='Show plots.')
+@click.option('--load_feature_vectors', default=None, help='Load feature vectors passed through SSL model (input name of vector file).')
 
 
-def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window_size_samples, high_cut_hz, low_cut_hz, sfreq, emb_size, lr, batch_size, n_epochs, n_channels, input_size_samples, edge_bundling_plot, annotations, show_plots):
+def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window_size_samples, high_cut_hz, low_cut_hz, sfreq, emb_size, lr, batch_size, n_epochs, n_channels, input_size_samples, edge_bundling_plot, annotations, show_plots, load_feature_vectors):
     print('STARTING MAIN')
     # set device to 'cuda' or 'cpu'
     device = hf.enable_cuda()
@@ -104,111 +105,126 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
     # compare_models(model.emb, emb)
 
 
-    # DOWNSTREAM TASK - FINE TUNING
+    # DOWNSTREAM TASK - FINE TUNING)
+    if load_feature_vectors is None:
+        windowed_data = load_bci_data(subject_size, window_size_samples, high_cut_hz, n_jobs)
+        # windowed_data = load_raws(subject_size, window_size_samples, high_cut_hz, n_jobs)
 
-    windowed_data = load_bci_data(subject_size, window_size_samples, high_cut_hz, n_jobs)
-    # windowed_data = load_raws(subject_size, window_size_samples, high_cut_hz, n_jobs)
+        ### Fine tune on Sleep staging SSL model
 
-    ### Fine tune on Sleep staging SSL model
+        # split by subject
 
-    # split by subject
-
-    subjects = np.unique(windowed_data.description['subject'])
-    subj_train, subj_test = train_test_split(
-        subjects, test_size=0.4, random_state=random_state)
-    subj_valid, subj_test = train_test_split(
-        subj_test, test_size=0.5, random_state=random_state)
-
-
-    split_ids = {'train': subj_train, 'valid': subj_valid, 'test': subj_test}
-    splitted = dict()
-    for name, values in split_ids.items():
-        splitted[name] = RelativePositioningDataset(
-            [ds for ds in windowed_data.datasets
-                if ds.description['subject'] in values])
+        subjects = np.unique(windowed_data.description['subject'])
+        subj_train, subj_test = train_test_split(
+            subjects, test_size=0.4, random_state=random_state)
+        subj_valid, subj_test = train_test_split(
+            subj_test, test_size=0.5, random_state=random_state)
 
 
-    tau_pos, tau_neg = int(sfreq * 60), int(sfreq * 15 * 60)
-    n_examples_train = 250 * len(splitted['train'].datasets)
-    n_examples_valid = 250 * len(splitted['valid'].datasets)
-    n_examples_test = 250 * len(splitted['test'].datasets)
+        split_ids = {'train': subj_train, 'valid': subj_valid, 'test': subj_test}
+        splitted = dict()
+        for name, values in split_ids.items():
+            splitted[name] = RelativePositioningDataset(
+                [ds for ds in windowed_data.datasets
+                    if ds.description['subject'] in values])
 
 
-    train_sampler = RelativePositioningSampler(
-        splitted['train'].get_metadata(), tau_pos=tau_pos, tau_neg=tau_neg,
-        n_examples=n_examples_train, same_rec_neg=True, random_state=random_state)
-    valid_sampler = RelativePositioningSampler(
-        splitted['valid'].get_metadata(), tau_pos=tau_pos, tau_neg=tau_neg,
-        n_examples=n_examples_valid, same_rec_neg=True,
-        random_state=random_state)
-    test_sampler = RelativePositioningSampler(
-        splitted['test'].get_metadata(), tau_pos=tau_pos, tau_neg=tau_neg,
-        n_examples=n_examples_test, same_rec_neg=True,
-        random_state=random_state)
+        tau_pos, tau_neg = int(sfreq * 60), int(sfreq * 15 * 60)
+        n_examples_train = 250 * len(splitted['train'].datasets)
+        n_examples_valid = 250 * len(splitted['valid'].datasets)
+        n_examples_test = 250 * len(splitted['test'].datasets)
 
 
-    ### trying w/o sequential layer
-    # model.emb.return_feats = True
-
-    batch_size = 512
-    num_workers = n_jobs
-
-    # Extract features with the trained embedder
-    data = dict()
-    for name, split in splitted.items():
-        split.return_pair = False  # Return single windows
-        loader = DataLoader(split, batch_size=batch_size, num_workers=num_workers)
-        with torch.no_grad():
-            feats = [model.emb(batch_x.to(device)).cpu().numpy()
-                        for batch_x, _, _ in loader]
-        data[name] = (np.concatenate(feats), split.get_metadata()['target'].values)
+        train_sampler = RelativePositioningSampler(
+            splitted['train'].get_metadata(), tau_pos=tau_pos, tau_neg=tau_neg,
+            n_examples=n_examples_train, same_rec_neg=True, random_state=random_state)
+        valid_sampler = RelativePositioningSampler(
+            splitted['valid'].get_metadata(), tau_pos=tau_pos, tau_neg=tau_neg,
+            n_examples=n_examples_valid, same_rec_neg=True,
+            random_state=random_state)
+        test_sampler = RelativePositioningSampler(
+            splitted['test'].get_metadata(), tau_pos=tau_pos, tau_neg=tau_neg,
+            n_examples=n_examples_test, same_rec_neg=True,
+            random_state=random_state)
 
 
-    # Initialize the logistic regression model
-    log_reg = LogisticRegression(
-        penalty='l2', C=1.0, class_weight='balanced', solver='sag',
-        multi_class='multinomial', random_state=random_state)
-    clf_pipe = make_pipeline(StandardScaler(), log_reg)
+        ### trying w/o sequential layer
+        # model.emb.return_feats = True
 
-    # Fit and score the logistic regression
-    clf_pipe.fit(*data['train'])
-    train_y_pred = clf_pipe.predict(data['train'][0])
-    valid_y_pred = clf_pipe.predict(data['valid'][0])
-    test_y_pred = clf_pipe.predict(data['test'][0])
-    # test_ds_y_pred = clf_pipe.predict(test_ds_data[0])
+        batch_size = 512
+        num_workers = n_jobs
 
-    train_bal_acc = balanced_accuracy_score(data['train'][1], train_y_pred)
-    valid_bal_acc = balanced_accuracy_score(data['valid'][1], valid_y_pred)
-    test_bal_acc = balanced_accuracy_score(data['test'][1], test_y_pred)
-    # test_ds_acc = balanced_accuracy_score(test_ds_data[1], test_ds_y_pred)
-
-    print('Sleep staging performance with logistic regression:')
-    print(f'Train bal acc: {train_bal_acc:0.4f}')
-    print(f'Valid bal acc: {valid_bal_acc:0.4f}')
-    print(f'Test bal acc: {test_bal_acc:0.4f}')
-    # print(f'Test bal acc: {test_ds_acc:0.4f}')
-
-    print('Results on test set:')
-    print(confusion_matrix(data['test'][1], test_y_pred))
-    print(classification_report(data['test'][1], test_y_pred))
-
-    metadata_string = f'{dataset_name}_{window_size_s}s_windows_{len(subjects)}_subjects_{device}_{sfreq}hz'
-
-    # ### save fine-tuned model
-    with open(f'models/finetuned/{hf.get_datetime()}_{metadata_string}.pkl', 'wb+') as f:
-        pickle.dump(clf_pipe, f)
-    f.close()
-
-    # ### load fine-tuned model
-    # with open('clf_pipe.pkl', 'rb') as f:
-    #     clf_pipe = pickle.load(f)
-    # f.close()
+        # Extract features with the trained embedder
+        data = dict()
+        for name, split in splitted.items():
+            split.return_pair = False  # Return single windows
+            loader = DataLoader(split, batch_size=batch_size, num_workers=num_workers)
+            with torch.no_grad():
+                feats = [model.emb(batch_x.to(device)).cpu().numpy()
+                            for batch_x, _, _ in loader]
+            data[name] = (np.concatenate(feats), split.get_metadata()['target'].values)
 
 
-    ### Visualizing clusterss
+        # Initialize the logistic regression model
+        log_reg = LogisticRegression(
+            penalty='l2', C=1.0, class_weight='balanced', solver='sag',
+            multi_class='multinomial', random_state=random_state)
+        clf_pipe = make_pipeline(StandardScaler(), log_reg)
 
-    X = np.concatenate([v[0] for k, v in data.items()])
-    y = np.concatenate([v[1] for k, v in data.items()])
+        # Fit and score the logistic regression
+        clf_pipe.fit(*data['train'])
+        train_y_pred = clf_pipe.predict(data['train'][0])
+        valid_y_pred = clf_pipe.predict(data['valid'][0])
+        test_y_pred = clf_pipe.predict(data['test'][0])
+        # test_ds_y_pred = clf_pipe.predict(test_ds_data[0])
+
+        train_bal_acc = balanced_accuracy_score(data['train'][1], train_y_pred)
+        valid_bal_acc = balanced_accuracy_score(data['valid'][1], valid_y_pred)
+        test_bal_acc = balanced_accuracy_score(data['test'][1], test_y_pred)
+        # test_ds_acc = balanced_accuracy_score(test_ds_data[1], test_ds_y_pred)
+
+        print('Sleep staging performance with logistic regression:')
+        print(f'Train bal acc: {train_bal_acc:0.4f}')
+        print(f'Valid bal acc: {valid_bal_acc:0.4f}')
+        print(f'Test bal acc: {test_bal_acc:0.4f}')
+        # print(f'Test bal acc: {test_ds_acc:0.4f}')
+
+        print('Results on test set:')
+        print(confusion_matrix(data['test'][1], test_y_pred))
+        print(classification_report(data['test'][1], test_y_pred))
+
+        metadata_string = f'{dataset_name}_{window_size_s}s_windows_{len(subjects)}_subjects_{device}_{sfreq}hz'
+
+        X = np.concatenate([v[0] for k, v in data.items()])
+        y = np.concatenate([v[1] for k, v in data.items()])
+
+        ### save fine-tuned model
+        with open(f'models/finetuned/{hf.get_datetime()}_{metadata_string}.pkl', 'wb+') as f:
+            pickle.dump(clf_pipe, f)
+        f.close()
+
+        ### save feature vectors
+        with open(f'data/feature_vectors/{hf.get_datetime()}_{metadata_string}.pkl', 'wb+') as f:
+            pickle.dump([X,y], f)
+        f.close()
+
+    else:
+        ### load fine-tuned model
+        metadata_string = load_feature_vectors
+        # with open(f'{metadata_string}.pkl', 'rb') as f:
+        #     clf_pipe = pickle.load(f)
+        # f.close()
+
+        ### load feature vectors
+        print(f':: loading feature vectors: {load_feature_vectors}')
+        with open(f'data/feature_vectors/{load_feature_vectors}.pkl', 'rb') as f:
+            feature_vectors = pickle.load(f)
+        f.close()
+
+        X, y = feature_vectors[0], feature_vectors[1]
+
+
+    ### Visualizing clusters
 
     # init plotting object
     p = Plot(metadata_string, show=show_plots)
