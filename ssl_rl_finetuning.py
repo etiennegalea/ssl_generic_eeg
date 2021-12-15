@@ -57,7 +57,7 @@ from plot import Plot
 ### Load model
 @click.command()
 @click.option('--dataset_name', '--dataset', '-n', default='bci', help='Dataset to be finetuned.')
-@click.option('--subject_size', default=10, help='Number of subjects to be trained - max 110.')
+@click.option('--subject_size', nargs=2, default=[1,10], help='Number of subjects to be trained - max 110.')
 @click.option('--random_state', default=87, help='')
 @click.option('--n_jobs', default=1, help='')
 # @click.option('--num_workers', default=1, help='')  # same as n_jobs
@@ -250,7 +250,7 @@ def load_bci_data(subject_size, window_size_samples, high_cut_hz, n_jobs):
         both feet (in runs 5, 6, 9, 10, 13, and 14)
     '''
 
-    subjects = range(1, subject_size) # max 110
+    subjects = range(subject_size[0], subject_size[1]) # max 110
     event_codes = [
         1, 2, # eyes open, eyes closed (baselines)
         3, 4, 5,
