@@ -6,6 +6,8 @@ from datetime import datetime
 import pickle
 import numpy as np
 import click
+import os
+from time import sleep
 
 import mne
 import torch
@@ -76,9 +78,10 @@ from plot import Plot
 @click.option('--annotations', default=['T0', 'T1', 'T2'], help='Annotations for plotting.')
 @click.option('--show_plots', '--show', default=False, help='Show plots.')
 @click.option('--load_feature_vectors', default=None, help='Load feature vectors passed through SSL model (input name of vector file).')
+@click.option('--load_latest_model', default=True, help='Load the latest pretrained model from the ssl_rl_pretraining.py script.')
 
 
-def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window_size_samples, high_cut_hz, low_cut_hz, sfreq, emb_size, lr, batch_size, n_epochs, n_channels, input_size_samples, edge_bundling_plot, annotations, show_plots, load_feature_vectors):
+def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window_size_samples, high_cut_hz, low_cut_hz, sfreq, emb_size, lr, batch_size, n_epochs, n_channels, input_size_samples, edge_bundling_plot, annotations, show_plots, load_feature_vectors, load_latest_model):
     print('STARTING MAIN')
     # set device to 'cuda' or 'cpu'
     device = hf.enable_cuda()
@@ -100,7 +103,14 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
 
     # load the pretrained model
     # (load the best model)
-    model = torch.load("models/pretrained/2021_12_15__01_34_22_sleep_staging_5s_windows_5_subjects_cpu_12_epochs_160hz.model")
+    if load_latest_model:
+        model_dir = "./models/pretrained/"
+        files = [os.path.join(model_dir, fname) for fname in os.listdir(model_dir)]
+        latest = max(files, key=os.path.getmtime).split(model_dir)[1].split('.')[0]
+        print(f":: loading the latest pretrained model: {latest}")
+        model = torch.load(f"{model_dir}{latest}.model")
+    else:
+        model = torch.load("models/pretrained/2021_12_15__01_34_22_sleep_staging_5s_windows_5_subjects_cpu_12_epochs_160hz.model")
 
     # compare_models(model.emb, emb)
 
