@@ -61,3 +61,11 @@ cover
 .venv/
 venv/
 *.json
+
+
+# data, models, plots and vectors
+models/
+plots/
+feature_vectors/
+data/
+
