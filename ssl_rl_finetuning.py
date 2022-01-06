@@ -117,14 +117,17 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
 
     # DOWNSTREAM TASK - FINE TUNING)
     if load_feature_vectors is None:
-        windowed_data = load_bci_data(subject_size, window_size_samples, high_cut_hz,sfreq, n_jobs)
-        # windowed_data = load_raws(subject_size, window_size_samples, high_cut_hz, n_jobs)
+        # data, descriptions = load_bci_data(subject_size)
+        # data, descriptions = load_sleep_staging_raws()
+        data, descriptions = load_space_bambi_raws()
+        data = preprocess_raws(data, sfreq, high_cut_hz, n_jobs)
+        windows_dataset = create_windows_dataset(data, window_size_samples, descriptions)
 
         ### Fine tune on Sleep staging SSL model
 
         # split by subject
 
-        subjects = np.unique(windowed_data.description['subject'])
+        subjects = np.unique(windows_dataset.description['subject'])
         subj_train, subj_test = train_test_split(
             subjects, test_size=0.4, random_state=random_state)
         subj_valid, subj_test = train_test_split(
@@ -135,7 +138,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
         splitted = dict()
         for name, values in split_ids.items():
             splitted[name] = RelativePositioningDataset(
-                [ds for ds in windowed_data.datasets
+                [ds for ds in windows_dataset.datasets
                     if ds.description['subject'] in values])
 
 
@@ -247,7 +250,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
 
 
 # load BCI data
-def load_bci_data(subject_size, window_size_samples, high_cut_hz, sfreq, n_jobs):
+def load_bci_data(subject_size):
     print('LOADING BCI DATA')
 
     ''' ANNOTATIONS
@@ -294,16 +297,61 @@ def load_bci_data(subject_size, window_size_samples, high_cut_hz, sfreq, n_jobs)
     # Load each of the files
     eegmmidb = [mne.io.read_raw_edf(path, preload=True, stim_channel='auto', exclude=exclude) for path in physionet_paths]
 
+    return eegmmidb, descriptions
 
-    ### preprocess
-    # high pass filtering of 30Hz
 
-    for raw in eegmmidb:
+def load_sleep_staging_raws():
+    print('LOADING SLEEP STAGING RAWS')
+    raw_set = [
+        '/home/maligan/mne_data/physionet-sleep-data/SC4012E0-PSG.edf'
+        '/home/maligan/mne_data/physionet-sleep-data/SC4451F0-PSG.edf'
+        '/home/maligan/mne_data/physionet-sleep-data/SC4441E0-PSG.edf'
+        '/home/maligan/mne_data/physionet-sleep-data/SC4431E0-PSG.edf'
+        '/home/maligan/mne_data/physionet-sleep-data/SC4421E0-PSG.edf'
+    ]
+
+    # load into raw array
+    raws = [mne.io.read_raw_edf(x) for x in raw_set]
+    # mne.io.RawArray(raws)
+
+    return raws, None
+
+
+def load_space_bambi_raws():
+    print('LOADING SPACE/BAMBI DATA')
+
+    # space_bambi directory
+    data_dir = './data/SPACE_BAMBI_2channels/'
+
+    raws = []
+
+    print(f'{len(os.listdir(data_dir))} files found')
+    for i, path in enumerate(os.listdir(data_dir)):
+        if i == 5:
+            break
+        full_path = os.path.join(data_dir, path)
+        raws.append(mne.io.read_raw_fif(full_path, preload=True))
+
+    return raws, None
+
+
+def preprocess_raws(raws, sfreq, high_cut_hz, n_jobs):
+    print('PREPROCESSING RAWS')
+    print(f'--resample {sfreq}')
+    print(f'--highcut freq {high_cut_hz}')
+
+    for raw in raws:
         mne.io.Raw.resample(raw, sfreq)   # resample
         mne.io.Raw.filter(raw, l_freq=None, h_freq=high_cut_hz, n_jobs=n_jobs)    # high-pass filter
 
-    eegmmidb_windows = create_from_mne_raw(
-        eegmmidb,
+    return raws
+
+
+def create_windows_dataset(raws, window_size_samples, descriptions=None):
+    print(f'Creating windows of size: {window_size_samples}')
+
+    windows_dataset = create_from_mne_raw(
+        raws,
         trial_start_offset_samples=0,
         trial_stop_offset_samples=0,
         window_size_samples=window_size_samples,
@@ -318,27 +366,7 @@ def load_bci_data(subject_size, window_size_samples, high_cut_hz, sfreq, n_jobs)
     )
 
     # channel-wise zscore normalization
-    preprocess(eegmmidb_windows, [Preprocessor(zscore)])
-
-    return eegmmidb_windows
-
-def load_raws():
-    print('LOADING RAWS')
-    raw_set = [
-        '/home/maligan/mne_data/physionet-sleep-data/SC4012E0-PSG.edf'
-        '/home/maligan/mne_data/physionet-sleep-data/SC4451F0-PSG.edf'
-        '/home/maligan/mne_data/physionet-sleep-data/SC4441E0-PSG.edf'
-        '/home/maligan/mne_data/physionet-sleep-data/SC4431E0-PSG.edf'
-        '/home/maligan/mne_data/physionet-sleep-data/SC4421E0-PSG.edf'
-    ]
-
-    # load into raw array
-    raws = [mne.io.read_raw_edf(x) for x in raw_set]
-    # mne.io.RawArray(raws)
-
-    raw_windows = raws
-
-    return raw_windows
+    preprocess(windows_dataset, [Preprocessor(zscore)])
 
 
 
