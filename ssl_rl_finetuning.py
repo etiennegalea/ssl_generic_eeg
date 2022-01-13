@@ -63,8 +63,8 @@ from plot import Plot
 @click.option('--random_state', default=87, help='')
 @click.option('--n_jobs', default=1, help='')
 # @click.option('--num_workers', default=1, help='')  # same as n_jobs
-@click.option('--window_size_s', default=5, help='Window sizes in seconds.')
-@click.option('--window_size_samples', default=500, help='Window sizes in milliseconds.')
+@click.option('--window_size_s', default=1, help='Window sizes in seconds.')
+@click.option('--window_size_samples', default=100, help='Window sizes in milliseconds.')
 @click.option('--high_cut_hz', '--hfreq', '-h', default=30, help='High-pass filter frequency.')
 @click.option('--low_cut_hz', '--lfreq', '-l', default=0, help='Low-pass filter frequency.')
 @click.option('--sfreq', default=160, help='Sampling frequency of the input data.')
@@ -72,8 +72,8 @@ from plot import Plot
 @click.option('--lr', default=5e-3, help='Learning rate of the pretrained model.')
 @click.option('--batch_size', default=512, help='Batch size of the pretrained model.')
 @click.option('--n_epochs', default=12, help='Number of epochs while training the pretrained model.')
-@click.option('--n_channels', default=2, help='Number of epochs while training the pretrained model.')
-@click.option('--input_size_samples', default=500, help='Number of epochs while training the pretrained model.')
+@click.option('--n_channels', default=2, help='Number of channels.')
+@click.option('--input_size_samples', default=100, help='Input size samples.')
 @click.option('--edge_bundling_plot', default=False, help='Plot UMAP connectivity plot with edge bundling (takes a long time).')
 @click.option('--annotations', default=['T0', 'T1', 'T2'], help='Annotations for plotting.')
 @click.option('--show_plots', '--show', default=False, help='Show plots.')
@@ -104,13 +104,14 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
     # load the pretrained model
     # (load the best model)
     if load_latest_model:
-        model_dir = "./models/pretrained/"
+        # model_dir = "./models/pretrained/"
+        model_dir = "/home/maligan/Documents/VU/Year_2/M.Sc._Thesis_[X_400285]/my_thesis/code/ssl_thesis/models/pretrained/"
         files = [os.path.join(model_dir, fname) for fname in os.listdir(model_dir)]
         latest = max(files, key=os.path.getmtime).split(model_dir)[1].split('.')[0]
         print(f":: loading the latest pretrained model: {latest}")
         model = torch.load(f"{model_dir}{latest}.model")
     else:
-        model = torch.load("models/pretrained/2021_12_15__01_34_22_sleep_staging_5s_windows_5_subjects_cpu_12_epochs_160hz.model")
+        model = torch.load("models/pretrained/2021_12_16__10_23_49_sleep_staging_5s_windows_83_subjects_cpu_15_epochs_100hz.model")
 
     # compare_models(model.emb, emb)
 
@@ -121,7 +122,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
         # data, descriptions = load_sleep_staging_raws()
         data, descriptions = load_space_bambi_raws()
         data = preprocess_raws(data, sfreq, high_cut_hz, n_jobs)
-        windows_dataset = create_windows_dataset(data, window_size_samples, descriptions)
+        windows_dataset = create_windows_dataset(data, window_size_samples, descriptions=descriptions)
 
         ### Fine tune on Sleep staging SSL model
 
@@ -321,7 +322,8 @@ def load_space_bambi_raws():
     print('LOADING SPACE/BAMBI DATA')
 
     # space_bambi directory
-    data_dir = './data/SPACE_BAMBI_2channels/'
+    # data_dir = './data/SPACE_BAMBI_2channels/'
+    data_dir = '/home/maligan/Documents/VU/Year_2/M.Sc._Thesis_[X_400285]/my_thesis/code/ssl_thesis/data/SPACE_BAMBI_2channels'
 
     raws = []
 
@@ -332,7 +334,21 @@ def load_space_bambi_raws():
         full_path = os.path.join(data_dir, path)
         raws.append(mne.io.read_raw_fif(full_path, preload=True))
 
-    return raws, None
+    descriptions = []
+
+    # for id, raw in enumerate(raws):
+    #     descriptions += [{
+    #         "subject": id,
+    #         "onset": annot['onset'], 
+    #         "duration": annot['duration'], 
+    #         "description": annot['description'], 
+    #         "orig_time": annot['orig_time']
+    #     } for annot in raw.annotations]
+
+    for subject_id, raw in enumerate(raws):
+        descriptions += [{"subject": subject_id}]
+
+    return raws, descriptions
 
 
 def preprocess_raws(raws, sfreq, high_cut_hz, n_jobs):
@@ -367,6 +383,8 @@ def create_windows_dataset(raws, window_size_samples, descriptions=None):
 
     # channel-wise zscore normalization
     preprocess(windows_dataset, [Preprocessor(zscore)])
+
+    return windows_dataset
 
 
 

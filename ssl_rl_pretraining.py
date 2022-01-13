@@ -67,13 +67,115 @@ def load_windowed_data(preprocessed_data):
     print(':: Preprocessed windowed data loaded...')
     return windows_dataset
 
+def load_sleep_staging_windowed_dataset(subjects, subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq):
+    dataset = SleepPhysionet(
+        subject_ids=subjects[subject_size],
+        recording_ids=[1],
+        crop_wake_mins=30,
+        load_eeg_only=True,
+        sfreq=sfreq,
+        n_jobs=n_jobs
+    )
+
+    preprocessors = [
+        Preprocessor(lambda x: x * 1e6), # convert to microvolts
+        Preprocessor('filter', l_freq=None, h_freq=high_cut_hz, n_jobs=n_jobs) # high pass filtering
+    ]
+
+    # Transform the data
+    preprocess(dataset, preprocessors)
+
+    # Extracting windows
+
+    mapping = {  # We merge stages 3 and 4 following AASM standards.
+        'Sleep stage W': 0,
+        'Sleep stage 1': 1,
+        'Sleep stage 2': 2,
+        'Sleep stage 3': 3,
+        'Sleep stage 4': 3,
+        'Sleep stage R': 4
+    }
+
+    windows_dataset = create_windows_from_events(
+        dataset, trial_start_offset_samples=0, trial_stop_offset_samples=0,
+        window_size_samples=window_size_samples,
+        window_stride_samples=window_size_samples, preload=True, mapping=mapping)
+
+    ### Preprocessing windows
+    preprocess(windows_dataset, [Preprocessor(zscore)])
+
+    return windows_dataset
+
+
+def load_space_bambi_windowed_dataset(n_jobs, window_size_samples, high_cut_hz, sfreq, accepted_bads_ratio):
+    print('LOADING SPACE/BAMBI DATA')
+
+    # space_bambi directory
+    # data_dir = './data/SPACE_BAMBI_2channels/'
+    data_dir = '/home/maligan/Documents/VU/Year_2/M.Sc._Thesis_[X_400285]/my_thesis/code/ssl_thesis/data/SPACE_BAMBI_2channels'
+
+    raws = []
+
+    print(f'{len(os.listdir(data_dir))} files found')
+    for i, path in enumerate(os.listdir(data_dir)):
+        if i == 6:
+            break
+        full_path = os.path.join(data_dir, path)
+        raws.append(mne.io.read_raw_fif(full_path, preload=True))
+
+    # extract descriptions from annotations
+    descriptions = []
+
+    for id, raw in enumerate(raws):
+    # print(id)
+        annots_per_subject = {}
+        for annot in raw.annotations:
+            # print(annot)
+            annotation = {
+                "onset": annot['onset'], 
+                "duration": annot['duration'], 
+                "description": annot['description'], 
+                "orig_time": annot['orig_time']
+            }
+            # print(annotation)
+            annots_per_subject[id] = annotation
+            # print(annots_per_subject)
+        descriptions.append(annots_per_subject)
+
+    # preprocessing
+    for raw in raws:
+        mne.io.Raw.resample(raw, sfreq)   # resample
+        mne.io.Raw.filter(raw, l_freq=None, h_freq=high_cut_hz, n_jobs=n_jobs)    # high-pass filter
+
+    # windowing
+    windows_dataset = create_from_mne_raw(
+        raws,
+        trial_start_offset_samples=0,
+        trial_stop_offset_samples=0,
+        window_size_samples=window_size_samples,
+        window_stride_samples=window_size_samples,
+        drop_last_window=True,
+        descriptions=descriptions,
+        accepted_bads_ratio=accepted_bads_ratio,
+        drop_bad_windows=True,
+        on_missing='ignore',
+        # mapping=mapping,
+        # preload=True
+    )
+
+    # channel-wise zscore normalization
+    preprocess(windows_dataset, [Preprocessor(zscore)])
+
+    return windows_dataset
+
+
 
 @click.command()
 @click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
 @click.option('--random_state', default=87, help='')
 @click.option('--n_jobs', default=1, help='')
-@click.option('--window_size_s', default=5, help='Window sizes in seconds.')
-@click.option('--window_size_samples', default=500, help='Window sizes in milliseconds.')
+@click.option('--window_size_s', default=1, help='Window sizes in seconds.')
+@click.option('--window_size_samples', default=100, help='Window sizes in milliseconds.')
 @click.option('--high_cut_hz', default=30, help='High-pass filter frequency.')
 @click.option('--low_cut_hz', default=0, help='Low-pass filter frequency.')
 @click.option('--sfreq', default=160, help='Sampling frequency of the input data.')
@@ -82,10 +184,14 @@ def load_windowed_data(preprocessed_data):
 @click.option('--batch_size', default=512, help='Batch size of the pretrained model.')
 @click.option('--n_epochs', default=12, help='Number of epochs while training the pretrained model.')
 @click.option('--preprocessed_data', '-d', default=None, help='Preprocessed windowed data from previous run.')
+@click.option('--accepted_bads_ratio', default=0.25, help='Acceptable proportion of trials with inconsistent length in a raw. \
+                If the number of trials whose length is exceeded by the window size is \
+                smaller than this, then only the corresponding trials are dropped, but \
+                the computation continues.')
 
 # https://physionet.org/content/sleep-edfx/1.0.0/
 # Electrode locations Fpz-Cz, Pz-Oz
-def main(subject_size, random_state, n_jobs, window_size_s, window_size_samples, high_cut_hz, low_cut_hz, sfreq, emb_size, lr, batch_size, n_epochs, preprocessed_data):
+def main(subject_size, random_state, n_jobs, window_size_s, window_size_samples, high_cut_hz, low_cut_hz, sfreq, emb_size, lr, batch_size, n_epochs, preprocessed_data, accepted_bads_ratio):
 
     emb_size = sfreq
 
@@ -109,44 +215,11 @@ def main(subject_size, random_state, n_jobs, window_size_s, window_size_samples,
         print(':: loading windowed dataset: ', preprocessed_data)
         windows_dataset = load_windowed_data(preprocessed_data)
     else:
-        dataset = SleepPhysionet(
-            subject_ids=subjects[subject_size],
-            recording_ids=[1],
-            crop_wake_mins=30,
-            load_eeg_only=True,
-            sfreq=sfreq,
-            n_jobs=n_jobs
-        )
-
-        preprocessors = [
-            Preprocessor(lambda x: x * 1e6), # convert to microvolts
-            Preprocessor('filter', l_freq=None, h_freq=high_cut_hz, n_jobs=n_jobs) # high pass filtering
-        ]
-
-        # Transform the data
-        preprocess(dataset, preprocessors)
-
-        # Extracting windows
-
-        mapping = {  # We merge stages 3 and 4 following AASM standards.
-            'Sleep stage W': 0,
-            'Sleep stage 1': 1,
-            'Sleep stage 2': 2,
-            'Sleep stage 3': 3,
-            'Sleep stage 4': 3,
-            'Sleep stage R': 4
-        }
-
-        windows_dataset = create_windows_from_events(
-            dataset, trial_start_offset_samples=0, trial_stop_offset_samples=0,
-            window_size_samples=window_size_samples,
-            window_stride_samples=window_size_samples, preload=True, mapping=mapping)
-
-        ### Preprocessing windows
-        preprocess(windows_dataset, [Preprocessor(zscore)])
+        windows_dataset = load_sleep_staging_windowed_dataset(subjects, subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq)
+        # windows_dataset = load_space_bambi_windowed_dataset(n_jobs, window_size_samples, high_cut_hz, sfreq, accepted_bads_ratio)
 
         ### save fine-tuned model
-        with open(f'data/preprocessed/{hf.get_datetime()}_{metadata_string}.pkl', 'wb+') as f:
+        with open(f'/home/maligan/Documents/VU/Year_2/M.Sc._Thesis_[X_400285]/my_thesis/code/ssl_thesis/data/preprocessed/{hf.get_datetime()}_{metadata_string}.pkl', 'wb+') as f:
             pickle.dump(windows_dataset, f)
         f.close()
         print(':: Data loaded, preprocessed and windowed.')
