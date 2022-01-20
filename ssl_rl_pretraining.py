@@ -8,6 +8,7 @@ from datetime import datetime
 import pickle
 import numpy as np
 import click
+from tabulate import tabulate
 
 import mne
 import torch
@@ -68,6 +69,7 @@ def load_windowed_data(preprocessed_data):
     return windows_dataset
 
 def load_sleep_staging_windowed_dataset(subjects, subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq):
+    print(f':: loading SLEEP STAGING data...')
     dataset = SleepPhysionet(
         subject_ids=subjects[subject_size],
         recording_ids=[1],
@@ -108,7 +110,7 @@ def load_sleep_staging_windowed_dataset(subjects, subject_size, n_jobs, window_s
 
 
 def load_space_bambi_windowed_dataset(n_jobs, window_size_samples, high_cut_hz, sfreq, accepted_bads_ratio):
-    print('LOADING SPACE/BAMBI DATA')
+    print(f':: loading SPACE/BAMBI data')
 
     # space_bambi directory
     # data_dir = './data/SPACE_BAMBI_2channels/'
@@ -118,29 +120,15 @@ def load_space_bambi_windowed_dataset(n_jobs, window_size_samples, high_cut_hz, 
 
     print(f'{len(os.listdir(data_dir))} files found')
     for i, path in enumerate(os.listdir(data_dir)):
-        if i == 6:
+        if i == 20:
             break
         full_path = os.path.join(data_dir, path)
         raws.append(mne.io.read_raw_fif(full_path, preload=True))
 
     # extract descriptions from annotations
     descriptions = []
-
-    for id, raw in enumerate(raws):
-    # print(id)
-        annots_per_subject = {}
-        for annot in raw.annotations:
-            # print(annot)
-            annotation = {
-                "onset": annot['onset'], 
-                "duration": annot['duration'], 
-                "description": annot['description'], 
-                "orig_time": annot['orig_time']
-            }
-            # print(annotation)
-            annots_per_subject[id] = annotation
-            # print(annots_per_subject)
-        descriptions.append(annots_per_subject)
+    for subject_id, raw in enumerate(raws):
+        descriptions += [{"subject": subject_id}]
 
     # preprocessing
     for raw in raws:
@@ -172,14 +160,14 @@ def load_space_bambi_windowed_dataset(n_jobs, window_size_samples, high_cut_hz, 
 
 @click.command()
 @click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
-@click.option('--random_state', default=87, help='')
-@click.option('--n_jobs', default=1, help='')
-@click.option('--window_size_s', default=1, help='Window sizes in seconds.')
-@click.option('--window_size_samples', default=100, help='Window sizes in milliseconds.')
+@click.option('--random_state', default=87, help='Set a static random state so that the same result is generated everytime.')
+@click.option('--n_jobs', default=1, help='Number of subprocesses to run.')
+@click.option('--window_size_s', default=5, help='Window sizes in seconds.')
+@click.option('--window_size_samples', default=500, help='Window sizes in milliseconds.')
 @click.option('--high_cut_hz', default=30, help='High-pass filter frequency.')
 @click.option('--low_cut_hz', default=0, help='Low-pass filter frequency.')
-@click.option('--sfreq', default=160, help='Sampling frequency of the input data.')
-@click.option('--emb_size', default=160, help='Embedding size of the model (should correspond to sampling frequency).')
+@click.option('--sfreq', default=500, help='Sampling frequency of the input data.')
+@click.option('--emb_size', default=500, help='Embedding size of the model (should correspond to sampling frequency).')
 @click.option('--lr', default=5e-3, help='Learning rate of the pretrained model.')
 @click.option('--batch_size', default=512, help='Batch size of the pretrained model.')
 @click.option('--n_epochs', default=12, help='Number of epochs while training the pretrained model.')
@@ -192,6 +180,9 @@ def load_space_bambi_windowed_dataset(n_jobs, window_size_samples, high_cut_hz, 
 # https://physionet.org/content/sleep-edfx/1.0.0/
 # Electrode locations Fpz-Cz, Pz-Oz
 def main(subject_size, random_state, n_jobs, window_size_s, window_size_samples, high_cut_hz, low_cut_hz, sfreq, emb_size, lr, batch_size, n_epochs, preprocessed_data, accepted_bads_ratio):
+    
+    # print all parameter vars
+    print(tabulate(locals().items(), tablefmt='fancy_grid'))
 
     emb_size = sfreq
 
@@ -215,8 +206,8 @@ def main(subject_size, random_state, n_jobs, window_size_s, window_size_samples,
         print(':: loading windowed dataset: ', preprocessed_data)
         windows_dataset = load_windowed_data(preprocessed_data)
     else:
-        windows_dataset = load_sleep_staging_windowed_dataset(subjects, subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq)
-        # windows_dataset = load_space_bambi_windowed_dataset(n_jobs, window_size_samples, high_cut_hz, sfreq, accepted_bads_ratio)
+        # windows_dataset = load_sleep_staging_windowed_dataset(subjects, subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq)
+        windows_dataset = load_space_bambi_windowed_dataset(n_jobs, window_size_samples, high_cut_hz, sfreq, accepted_bads_ratio)
 
         ### save fine-tuned model
         with open(f'/home/maligan/Documents/VU/Year_2/M.Sc._Thesis_[X_400285]/my_thesis/code/ssl_thesis/data/preprocessed/{hf.get_datetime()}_{metadata_string}.pkl', 'wb+') as f:
@@ -256,17 +247,18 @@ def main(subject_size, random_state, n_jobs, window_size_s, window_size_samples,
     valid_sampler = RelativePositioningSampler(
         splitted['valid'].get_metadata(), tau_pos=tau_pos, tau_neg=tau_neg,
         n_examples=n_examples_valid, same_rec_neg=True,
-        random_state=random_state).presample()
+        random_state=random_state)
     test_sampler = RelativePositioningSampler(
         splitted['test'].get_metadata(), tau_pos=tau_pos, tau_neg=tau_neg,
         n_examples=n_examples_test, same_rec_neg=True,
-        random_state=random_state).presample()
+        random_state=random_state)
 
 
     ### Creating the model
 
     # Extract number of channels and time steps from dataset
     n_channels, input_size_samples = windows_dataset[0][0].shape
+    print(f':: number of channels: {n_channels}\n:: input size samples: {input_size_samples}')
 
 
     emb = SleepStagerChambon2018(

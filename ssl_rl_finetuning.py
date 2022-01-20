@@ -8,6 +8,8 @@ import numpy as np
 import click
 import os
 from time import sleep
+from tabulate import tabulate
+import pandas as pd
 
 import mne
 import torch
@@ -58,22 +60,21 @@ from plot import Plot
 
 ### Load model
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='bci', help='Dataset to be finetuned.')
+@click.option('--dataset_name', '--dataset', '-n', default='tuh_abnormal', help='Dataset to be finetuned.')
 @click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
-@click.option('--random_state', default=87, help='')
-@click.option('--n_jobs', default=1, help='')
-# @click.option('--num_workers', default=1, help='')  # same as n_jobs
-@click.option('--window_size_s', default=1, help='Window sizes in seconds.')
-@click.option('--window_size_samples', default=100, help='Window sizes in milliseconds.')
+@click.option('--random_state', default=87, help='Set a static random state so that the same result is generated everytime.')
+@click.option('--n_jobs', default=1, help='Number of subprocesses to run.')
+@click.option('--window_size_s', default=5, help='Window sizes in seconds.')
+@click.option('--window_size_samples', default=500, help='Window sizes in milliseconds.')
 @click.option('--high_cut_hz', '--hfreq', '-h', default=30, help='High-pass filter frequency.')
-@click.option('--low_cut_hz', '--lfreq', '-l', default=0, help='Low-pass filter frequency.')
-@click.option('--sfreq', default=160, help='Sampling frequency of the input data.')
-@click.option('--emb_size', default=160, help='Embedding size of the model (should correspond to sampling frequency).')
+@click.option('--low_cut_hz', '--lfreq', '-l', default=0.5, help='Low-pass filter frequency.')
+@click.option('--sfreq', default=100, help='Sampling frequency of the input data.')
+@click.option('--emb_size', default=100, help='Embedding size of the model (should correspond to sampling frequency).')
 @click.option('--lr', default=5e-3, help='Learning rate of the pretrained model.')
 @click.option('--batch_size', default=512, help='Batch size of the pretrained model.')
 @click.option('--n_epochs', default=12, help='Number of epochs while training the pretrained model.')
 @click.option('--n_channels', default=2, help='Number of channels.')
-@click.option('--input_size_samples', default=100, help='Input size samples.')
+# @click.option('--input_size_samples', default=100, help='Input size samples.')
 @click.option('--edge_bundling_plot', default=False, help='Plot UMAP connectivity plot with edge bundling (takes a long time).')
 @click.option('--annotations', default=['T0', 'T1', 'T2'], help='Annotations for plotting.')
 @click.option('--show_plots', '--show', default=False, help='Show plots.')
@@ -81,8 +82,13 @@ from plot import Plot
 @click.option('--load_latest_model', default=True, help='Load the latest pretrained model from the ssl_rl_pretraining.py script.')
 
 
-def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window_size_samples, high_cut_hz, low_cut_hz, sfreq, emb_size, lr, batch_size, n_epochs, n_channels, input_size_samples, edge_bundling_plot, annotations, show_plots, load_feature_vectors, load_latest_model):
-    print('STARTING MAIN')
+def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window_size_samples, low_cut_hz, high_cut_hz, sfreq, emb_size, lr, batch_size, n_epochs, n_channels, edge_bundling_plot, annotations, show_plots, load_feature_vectors, load_latest_model):
+    print(':: STARTING MAIN ::')
+
+    # print all parameter vars
+    print(tabulate(locals().items(), tablefmt='fancy_grid'))
+    
+    # print local parameters
     # set device to 'cuda' or 'cpu'
     device = hf.enable_cuda()
     # Set random seed to be able to reproduce results
@@ -96,10 +102,12 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
         sfreq=sfreq,
         n_classes=emb_size,
         n_conv_chs=16,
-        input_size_s=input_size_samples / sfreq,
+        input_size_s=window_size_samples / sfreq,
         dropout=0,
         apply_batch_norm=True
     )
+
+    print(emb)
 
     # load the pretrained model
     # (load the best model)
@@ -114,15 +122,14 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
         model = torch.load("models/pretrained/2021_12_16__10_23_49_sleep_staging_5s_windows_83_subjects_cpu_15_epochs_100hz.model")
 
     # compare_models(model.emb, emb)
-
+    print(model)
 
     # DOWNSTREAM TASK - FINE TUNING)
     if load_feature_vectors is None:
         # data, descriptions = load_bci_data(subject_size)
         # data, descriptions = load_sleep_staging_raws()
-        data, descriptions = load_space_bambi_raws()
-        data = preprocess_raws(data, sfreq, high_cut_hz, n_jobs)
-        windows_dataset = create_windows_dataset(data, window_size_samples, descriptions=descriptions)
+        # data, descriptions = load_space_bambi_raws()
+        windows_dataset = load_abnormal_raws(sfreq, high_cut_hz, n_jobs, window_size_samples)
 
         ### Fine tune on Sleep staging SSL model
 
@@ -252,7 +259,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
 
 # load BCI data
 def load_bci_data(subject_size):
-    print('LOADING BCI DATA')
+    print(':: loading BCI data')
 
     ''' ANNOTATIONS
     T0 corresponds to rest
@@ -302,7 +309,7 @@ def load_bci_data(subject_size):
 
 
 def load_sleep_staging_raws():
-    print('LOADING SLEEP STAGING RAWS')
+    print(':: loading SLEEP STAGING raws')
     raw_set = [
         '/home/maligan/mne_data/physionet-sleep-data/SC4012E0-PSG.edf'
         '/home/maligan/mne_data/physionet-sleep-data/SC4451F0-PSG.edf'
@@ -319,7 +326,7 @@ def load_sleep_staging_raws():
 
 
 def load_space_bambi_raws():
-    print('LOADING SPACE/BAMBI DATA')
+    print(':: loading SPACE/BAMBI data')
 
     # space_bambi directory
     # data_dir = './data/SPACE_BAMBI_2channels/'
@@ -336,35 +343,120 @@ def load_space_bambi_raws():
 
     descriptions = []
 
-    # for id, raw in enumerate(raws):
-    #     descriptions += [{
-    #         "subject": id,
-    #         "onset": annot['onset'], 
-    #         "duration": annot['duration'], 
-    #         "description": annot['description'], 
-    #         "orig_time": annot['orig_time']
-    #     } for annot in raw.annotations]
-
     for subject_id, raw in enumerate(raws):
         descriptions += [{"subject": subject_id}]
 
     return raws, descriptions
 
 
-def preprocess_raws(raws, sfreq, high_cut_hz, n_jobs):
-    print('PREPROCESSING RAWS')
+
+def get_file_list(x):
+    return [os.path.join(x, fname) for fname in os.listdir(x)]
+
+def get_id(x):
+    return x.split('/')[-1]
+
+
+def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
+    print(':: loading TUH abnormal data')
+
+    data_dir = '/media/maligan/My Passport/msc_thesis/ssl_thesis/data/tuh_abnormal_data/eval/'
+
+    # build data dictionary
+    annotations = {}
+    for annotation in get_file_list(data_dir):
+        subjects = {}
+        for subject in get_file_list(annotation):
+            recordings = {}
+            for recording in get_file_list(subject):
+                dates = {}
+                for date in get_file_list(recording):
+                    for raw_path in get_file_list(date):
+                        if '_2_channels.fif' in get_id(raw_path):
+                            break
+                        else:
+                            pass
+                    dates[get_id(date)] = raw_path
+                recordings[get_id(recording)] = dates
+            subjects[get_id(subject)] = recordings
+        annotations[get_id(annotation)] = subjects
+    
+
+    df = pd.json_normalize(annotations, sep='_').T
+
+    # paths list
+    raw_paths = [df.iloc[i][0] for i in range(len(df))]
+
+    # define abnormal and normal subjects
+    
+    abnormal_subjects = annotations['abnormal'].keys()
+    normal_subjects = annotations['normal'].keys()
+
+    # define descriptions (recoding per subject)
+    abnormal_descriptions, normal_descriptions = [], []
+    for id in abnormal_subjects:
+        for recording in annotations['abnormal'][id].values():
+            abnormal_descriptions += [{'subject': id, 'recording': x} for x in recording.keys()]
+    for id in normal_subjects:
+        for recording in annotations['normal'][id].values():
+            normal_descriptions += [{'subject': id, 'recording': x} for x in recording.keys()]
+
+    descriptions = abnormal_descriptions + normal_descriptions
+
+    # shuffle raw_paths and descriptions
+    from sklearn.utils import shuffle
+    raw_paths, descriptions = shuffle(raw_paths, descriptions)
+
+    # limiters
+    raw_paths = raw_paths[:10]
+    descriptions = descriptions[:10]
+
+    # load data
+    dataset = [mne.io.read_raw_fif(path) for path in raw_paths]
+
+    # preprocess dataset
+    dataset = preprocess_raws(dataset, sfreq, low_cut_hz, high_cut_hz, n_jobs)
+
+    print(f':: Creating windows of size: {window_size_samples}ms')
+
+    windows_dataset = create_from_mne_raw(
+        dataset,
+        trial_start_offset_samples=0,
+        trial_stop_offset_samples=0,
+        window_size_samples=window_size_samples,
+        window_stride_samples=window_size_samples,
+        drop_last_window=True,
+        descriptions=descriptions,
+        accepted_bads_ratio=0.5,
+        drop_bad_windows=True,
+        on_missing='ignore',
+        # mapping=mapping,
+        # preload=True
+    )
+
+    # channel-wise zscore normalization
+    preprocess(windows_dataset, [Preprocessor(zscore)])
+
+    return windows_dataset
+
+
+
+
+def preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs):
+    print(':: PREPROCESSING RAWS')
     print(f'--resample {sfreq}')
-    print(f'--highcut freq {high_cut_hz}')
+    print(f'--high_cut freq {high_cut_hz}')
+    print(f'--low_cut freq {low_cut_hz}')
 
     for raw in raws:
         mne.io.Raw.resample(raw, sfreq)   # resample
-        mne.io.Raw.filter(raw, l_freq=None, h_freq=high_cut_hz, n_jobs=n_jobs)    # high-pass filter
+        mne.io.Raw.filter(raw, l_freq=low_cut_hz, h_freq=high_cut_hz, n_jobs=n_jobs)    # high-pass filter
 
     return raws
 
 
 def create_windows_dataset(raws, window_size_samples, descriptions=None):
-    print(f'Creating windows of size: {window_size_samples}')
+    print(f':: Creating windows of size: {window_size_samples}')
 
     windows_dataset = create_from_mne_raw(
         raws,
@@ -374,7 +466,7 @@ def create_windows_dataset(raws, window_size_samples, descriptions=None):
         window_stride_samples=window_size_samples,
         drop_last_window=True,
         descriptions=descriptions,
-        accepted_bads_ratio=0.5,
+        accepted_bads_ratio=0.0,
         drop_bad_windows=True,
         on_missing='ignore',
         # mapping=mapping,
