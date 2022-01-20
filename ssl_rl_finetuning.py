@@ -10,6 +10,7 @@ import os
 from time import sleep
 from tabulate import tabulate
 import pandas as pd
+import pprint
 
 import mne
 import torch
@@ -76,7 +77,8 @@ from plot import Plot
 @click.option('--n_channels', default=2, help='Number of channels.')
 # @click.option('--input_size_samples', default=100, help='Input size samples.')
 @click.option('--edge_bundling_plot', default=False, help='Plot UMAP connectivity plot with edge bundling (takes a long time).')
-@click.option('--annotations', default=['T0', 'T1', 'T2'], help='Annotations for plotting.')
+# @click.option('--annotations', default=['T0', 'T1', 'T2'], help='Annotations for plotting.')
+@click.option('--annotations', default=['abnormal', 'normal'], help='Annotations for plotting.')
 @click.option('--show_plots', '--show', default=False, help='Show plots.')
 @click.option('--load_feature_vectors', default=None, help='Load feature vectors passed through SSL model (input name of vector file).')
 @click.option('--load_latest_model', default=True, help='Load the latest pretrained model from the ssl_rl_pretraining.py script.')
@@ -126,10 +128,10 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
 
     # DOWNSTREAM TASK - FINE TUNING)
     if load_feature_vectors is None:
-        # data, descriptions = load_bci_data(subject_size)
+        # windows_dataset = load_bci_data(subject_size, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         # data, descriptions = load_sleep_staging_raws()
         # data, descriptions = load_space_bambi_raws()
-        windows_dataset = load_abnormal_raws(sfreq, high_cut_hz, n_jobs, window_size_samples)
+        windows_dataset = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
 
         ### Fine tune on Sleep staging SSL model
 
@@ -258,7 +260,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
 
 
 # load BCI data
-def load_bci_data(subject_size):
+def load_bci_data(subject_size, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
     print(':: loading BCI data')
 
     ''' ANNOTATIONS
@@ -305,7 +307,13 @@ def load_bci_data(subject_size):
     # Load each of the files
     eegmmidb = [mne.io.read_raw_edf(path, preload=True, stim_channel='auto', exclude=exclude) for path in physionet_paths]
 
-    return eegmmidb, descriptions
+    # preprocess dataset
+    dataset = preprocess_raws(eegmmidb, sfreq, low_cut_hz, high_cut_hz, n_jobs)
+
+    # create windows
+    windows_dataset = create_windows_dataset(dataset, window_size_samples, descriptions)
+
+    return windows_dataset
 
 
 def load_sleep_staging_raws():
@@ -393,49 +401,56 @@ def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sampl
     normal_subjects = annotations['normal'].keys()
 
     # define descriptions (recoding per subject)
-    abnormal_descriptions, normal_descriptions = [], []
+    abnormal_descriptions, normal_descriptions, classification = [], [], []
     for id in abnormal_subjects:
         for recording in annotations['abnormal'][id].values():
-            abnormal_descriptions += [{'subject': id, 'recording': x} for x in recording.keys()]
+            for x in recording.keys():
+                abnormal_descriptions += [{'subject': id, 'recording': x}]
+                classification += ['abnormal']
     for id in normal_subjects:
         for recording in annotations['normal'][id].values():
-            normal_descriptions += [{'subject': id, 'recording': x} for x in recording.keys()]
+            for x in recording.keys():
+                normal_descriptions += [{'subject': id, 'recording': x}]
+                classification += ['normal']
 
     descriptions = abnormal_descriptions + normal_descriptions
 
     # shuffle raw_paths and descriptions
     from sklearn.utils import shuffle
-    raw_paths, descriptions = shuffle(raw_paths, descriptions)
+    raw_paths, descriptions, classification = shuffle(raw_paths, descriptions, classification)
 
     # limiters
-    raw_paths = raw_paths[:10]
-    descriptions = descriptions[:10]
+    raw_paths = raw_paths
+    descriptions = descriptions
 
-    # load data
-    dataset = [mne.io.read_raw_fif(path) for path in raw_paths]
+    log = {
+        'abnormal': [],
+        'normal': []
+    }
+
+    # load data and set annotations
+    dataset = []
+    for i, path in enumerate(raw_paths):
+        _class = classification[i]
+        raw = mne.io.read_raw_fif(path)
+        raw = raw.set_annotations(mne.Annotations(onset=[0], duration=raw.times.max(), description=[_class]))
+        dataset.append(raw)
+
+    pp = pprint.PrettyPrinter(indent=2)
+    pp.pprint(raw_paths)
+    pp.pprint(dataset)
+    pp.pprint(log)
 
     # preprocess dataset
     dataset = preprocess_raws(dataset, sfreq, low_cut_hz, high_cut_hz, n_jobs)
 
-    print(f':: Creating windows of size: {window_size_samples}ms')
+    mapping = {
+        'abnormal': 0,
+        'normal': 1
+    }
 
-    windows_dataset = create_from_mne_raw(
-        dataset,
-        trial_start_offset_samples=0,
-        trial_stop_offset_samples=0,
-        window_size_samples=window_size_samples,
-        window_stride_samples=window_size_samples,
-        drop_last_window=True,
-        descriptions=descriptions,
-        accepted_bads_ratio=0.5,
-        drop_bad_windows=True,
-        on_missing='ignore',
-        # mapping=mapping,
-        # preload=True
-    )
-
-    # channel-wise zscore normalization
-    preprocess(windows_dataset, [Preprocessor(zscore)])
+    # create windows
+    windows_dataset = create_windows_dataset(dataset, window_size_samples, descriptions, mapping)
 
     return windows_dataset
 
@@ -455,7 +470,7 @@ def preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs):
     return raws
 
 
-def create_windows_dataset(raws, window_size_samples, descriptions=None):
+def create_windows_dataset(raws, window_size_samples, descriptions=None, mapping=None):
     print(f':: Creating windows of size: {window_size_samples}')
 
     windows_dataset = create_from_mne_raw(
@@ -465,11 +480,11 @@ def create_windows_dataset(raws, window_size_samples, descriptions=None):
         window_size_samples=window_size_samples,
         window_stride_samples=window_size_samples,
         drop_last_window=True,
-        descriptions=descriptions,
         accepted_bads_ratio=0.0,
         drop_bad_windows=True,
         on_missing='ignore',
-        # mapping=mapping,
+        descriptions=descriptions,
+        mapping=mapping,
         # preload=True
     )
 
