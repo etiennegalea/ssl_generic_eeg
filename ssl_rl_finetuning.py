@@ -61,8 +61,9 @@ from plot import Plot
 
 ### Load model
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='tuh_abnormal', help='Dataset to be finetuned.')
-@click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
+@click.option('--dataset_name', '--dataset', '-n', default='sleep_staging', help='Dataset to be finetuned.')
+# @click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
+@click.option('--subject_size', default='some', help='sample (0-5), some (0-40), all (83)')
 @click.option('--random_state', default=87, help='Set a static random state so that the same result is generated everytime.')
 @click.option('--n_jobs', default=1, help='Number of subprocesses to run.')
 @click.option('--window_size_s', default=5, help='Window sizes in seconds.')
@@ -78,7 +79,8 @@ from plot import Plot
 # @click.option('--input_size_samples', default=100, help='Input size samples.')
 @click.option('--edge_bundling_plot', default=False, help='Plot UMAP connectivity plot with edge bundling (takes a long time).')
 # @click.option('--annotations', default=['T0', 'T1', 'T2'], help='Annotations for plotting.')
-@click.option('--annotations', default=['abnormal', 'normal'], help='Annotations for plotting.')
+# @click.option('--annotations', default=['abnormal', 'normal'], help='Annotations for plotting.')
+@click.option('--annotations', default=['W', 'N1', 'N2', 'N3', 'R'], help='Annotations for plotting.')
 @click.option('--show_plots', '--show', default=False, help='Show plots.')
 @click.option('--load_feature_vectors', default=None, help='Load feature vectors passed through SSL model (input name of vector file).')
 @click.option('--load_latest_model', default=True, help='Load the latest pretrained model from the ssl_rl_pretraining.py script.')
@@ -129,9 +131,10 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
     # DOWNSTREAM TASK - FINE TUNING)
     if load_feature_vectors is None:
         # windows_dataset = load_bci_data(subject_size, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
+        windows_dataset = load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq)
         # data, descriptions = load_sleep_staging_raws()
         # data, descriptions = load_space_bambi_raws()
-        windows_dataset = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
+        # windows_dataset = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
 
         ### Fine tune on Sleep staging SSL model
 
@@ -253,7 +256,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
     p = Plot(metadata_string, show=show_plots)
 
     p.plot_UMAP(X, y, annotations)
-    p.plot_UMAP_connectivity(X)
+    # p.plot_UMAP_connectivity(X)
     if edge_bundling_plot:
         p.plot_UMAP_connectivity(X, edge_bundling=True)
     p.plot_UMAP_3d(X, y)
@@ -315,6 +318,52 @@ def load_bci_data(subject_size, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_s
 
     return windows_dataset
 
+def load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq):
+    print(f':: loading SLEEP STAGING data...')
+
+    subjects = {
+        'sample': [*range(5)],
+        'some': [*range(0,40)],
+        'all': [*range(0,83)],
+    }
+
+    dataset = SleepPhysionet(
+        subject_ids=subjects[subject_size],
+        recording_ids=[1],
+        crop_wake_mins=30,
+        load_eeg_only=True,
+        sfreq=sfreq,
+        n_jobs=n_jobs
+    )
+
+    preprocessors = [
+        Preprocessor(lambda x: x * 1e6), # convert to microvolts
+        Preprocessor('filter', l_freq=None, h_freq=high_cut_hz, n_jobs=n_jobs) # high pass filtering
+    ]
+
+    # Transform the data
+    preprocess(dataset, preprocessors)
+
+    # Extracting windows
+
+    mapping = {  # We merge stages 3 and 4 following AASM standards.
+        'Sleep stage W': 0,
+        'Sleep stage 1': 1,
+        'Sleep stage 2': 2,
+        'Sleep stage 3': 3,
+        'Sleep stage 4': 3,
+        'Sleep stage R': 4
+    }
+
+    windows_dataset = create_windows_from_events(
+        dataset, trial_start_offset_samples=0, trial_stop_offset_samples=0,
+        window_size_samples=window_size_samples,
+        window_stride_samples=window_size_samples, preload=True, mapping=mapping)
+
+    ### Preprocessing windows
+    preprocess(windows_dataset, [Preprocessor(zscore)])
+
+    return windows_dataset
 
 def load_sleep_staging_raws():
     print(':: loading SLEEP STAGING raws')
