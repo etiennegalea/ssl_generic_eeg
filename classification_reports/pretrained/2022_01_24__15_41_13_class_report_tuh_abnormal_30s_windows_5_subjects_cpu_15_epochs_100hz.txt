@@ -1,0 +1,8 @@
+('              precision    recall  f1-score   support\n'
+ '\n'
+ '         0.0       0.47      0.59      0.52       109\n'
+ '         1.0       0.60      0.48      0.54       141\n'
+ '\n'
+ '    accuracy                           0.53       250\n'
+ '   macro avg       0.53      0.53      0.53       250\n'
+ 'weighted avg       0.54      0.53      0.53       250\n')

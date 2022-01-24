@@ -11,6 +11,8 @@ import click
 from tabulate import tabulate
 import pprint
 import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 import mne
 import torch
@@ -339,9 +341,9 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
         print(':: loading PREPROCESSED windowed dataset: ', preprocessed_data)
         windows_dataset = load_windowed_data(preprocessed_data)
     else:
-        # windows_dataset = load_sleep_staging_windowed_dataset(subjects, subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq)
+        windows_dataset = load_sleep_staging_windowed_dataset(subjects, subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq)
         # windows_dataset = load_space_bambi_windowed_dataset(n_jobs, window_size_samples, high_cut_hz, sfreq, accepted_bads_ratio)
-        windows_dataset = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
+        # windows_dataset = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
 
         ### save fine-tuned model
         with open(f'/home/maligan/Documents/VU/Year_2/M.Sc._Thesis_[X_400285]/my_thesis/code/ssl_thesis/data/preprocessed/{hf.get_datetime()}_{metadata_string}.pkl', 'wb+') as f:
@@ -455,9 +457,18 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
     y_pred = clf.forward(splitted['test'], training=False) > 0
     y_true = [y for _, _, y in test_sampler]
 
-    print(confusion_matrix(y_true, y_pred))
-    print(classification_report(y_true, y_pred))
+    # confusion matrix
+    conf_matrix = confusion_matrix(y_true, y_pred)
+    print(conf_matrix)
+    # save plot
+    p.plot_confusion_matrix(conf_matrix)
 
+    # classification report
+    class_report = classification_report(y_true, y_pred)
+    print(classification_report(y_true, y_pred))
+    # save report
+    with open(f'classification_reports/pretrained/{hf.get_datetime()}_class_report_{metadata_string}.txt', "w") as f:
+        f.write(pprint.pformat(class_report, indent=4, sort_dicts=False))
 
     ### Save model
     model_name = f'models/pretrained/{hf.get_datetime()}_{metadata_string}.model'

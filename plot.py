@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 # %matplotlib inline
 from matplotlib.lines import Line2D
 from matplotlib import cm
+import seaborn as sns
 
 import umap.plot
 import umap.umap_ as UMAP
@@ -28,6 +29,7 @@ class Plot:
         # show fig
         if self.show:
             figure.show()
+        figure.close()
 
     # Extract loss and balanced accuracy values for plotting from history object
     def plot_acc(self, clf_history):
@@ -65,6 +67,13 @@ class Plot:
         plt.tight_layout()
         self._plot(plt, 'train_loss_acc')
         print(':: accuracy plot saved')
+
+
+    def plot_confusion_matrix(self, conf_matrix):
+        sns.heatmap(conf_matrix, annot=True, fmt='d', linewidths=2)
+        self._plot(plt, 'conf_matrix')
+        print(':: confusion matrix heatmap saved')
+
 
 
     def plot_UMAP(self, X, y, annotations=['W', 'N1', 'N2', 'N3', 'R']):
