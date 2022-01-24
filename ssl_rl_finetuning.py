@@ -67,11 +67,11 @@ from plot import Plot
 @click.option('--random_state', default=87, help='Set a static random state so that the same result is generated everytime.')
 @click.option('--n_jobs', default=1, help='Number of subprocesses to run.')
 @click.option('--window_size_s', default=5, help='Window sizes in seconds.')
-@click.option('--window_size_samples', default=500, help='Window sizes in milliseconds.')
+# @click.option('--window_size_samples', default=500, help='Window sizes in milliseconds.')
 @click.option('--high_cut_hz', '--hfreq', '-h', default=30, help='High-pass filter frequency.')
 @click.option('--low_cut_hz', '--lfreq', '-l', default=0.5, help='Low-pass filter frequency.')
 @click.option('--sfreq', default=100, help='Sampling frequency of the input data.')
-@click.option('--emb_size', default=100, help='Embedding size of the model (should correspond to sampling frequency).')
+# @click.option('--emb_size', default=100, help='Embedding size of the model (should correspond to sampling frequency).')
 @click.option('--lr', default=5e-3, help='Learning rate of the pretrained model.')
 @click.option('--batch_size', default=512, help='Batch size of the pretrained model.')
 @click.option('--n_epochs', default=12, help='Number of epochs while training the pretrained model.')
@@ -86,7 +86,7 @@ from plot import Plot
 @click.option('--load_latest_model', default=True, help='Load the latest pretrained model from the ssl_rl_pretraining.py script.')
 
 
-def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window_size_samples, low_cut_hz, high_cut_hz, sfreq, emb_size, lr, batch_size, n_epochs, n_channels, edge_bundling_plot, annotations, show_plots, load_feature_vectors, load_latest_model):
+def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cut_hz, high_cut_hz, sfreq, lr, batch_size, n_epochs, n_channels, edge_bundling_plot, annotations, show_plots, load_feature_vectors, load_latest_model):
     print(':: STARTING MAIN ::')
 
     # print all parameter vars
@@ -98,6 +98,8 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
     # Set random seed to be able to reproduce results
     set_random_seeds(seed=random_state, cuda=device == 'cuda')
 
+    window_size_samples = window_size_s * sfreq
+    emb_size = sfreq
 
     # instantiate classes
 
@@ -133,8 +135,8 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
         # windows_dataset = load_bci_data(subject_size, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         # windows_dataset = load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq)
         # data, descriptions = load_sleep_staging_raws()
-        # data, descriptions = load_space_bambi_raws()
-        windows_dataset = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
+        windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
+        # windows_dataset = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
 
         ### Fine tune on Sleep staging SSL model
 
@@ -153,13 +155,6 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, window
             splitted[name] = RelativePositioningDataset(
                 [ds for ds in windows_dataset.datasets
                     if ds.description['subject'] in values])
-
-
-        tau_pos, tau_neg = int(sfreq * 60), int(sfreq * 15 * 60)
-        n_examples_train = 250 * len(splitted['train'].datasets)
-        n_examples_valid = 250 * len(splitted['valid'].datasets)
-        n_examples_test = 250 * len(splitted['test'].datasets)
-
 
         ### trying w/o sequential layer
         # model.emb.return_feats = True
@@ -369,7 +364,7 @@ def load_sleep_staging_raws():
     return raws, None
 
 
-def load_space_bambi_raws():
+def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
     print(':: loading SPACE/BAMBI data')
 
     # space_bambi directory
@@ -377,26 +372,45 @@ def load_space_bambi_raws():
     data_dir = '/home/maligan/Documents/VU/Year_2/M.Sc._Thesis_[X_400285]/my_thesis/code/ssl_thesis/data/SPACE_BAMBI_2channels'
 
     raws = []
+    # added = 0
 
     print(f'{len(os.listdir(data_dir))} files found')
     for i, path in enumerate(os.listdir(data_dir)):
-        if i == 5:
-            break
         full_path = os.path.join(data_dir, path)
-        raws.append(mne.io.read_raw_fif(full_path, preload=True))
+        # check whether raw has longer duration than window_size
+        raw = mne.io.read_raw_fif(full_path)
+        # duration = raw.times.max()
+        # print(f':: duration of [{path}]: {duration} / {window_size_samples}')
+        # if duration > window_size_samples:
+        raws.append(raw)
+
+        if i > 5:
+            break
+
+    print(raws)
 
     descriptions = []
 
     for subject_id, raw in enumerate(raws):
         descriptions += [{"subject": subject_id}]
 
-    return raws, descriptions
+    # preprocess dataset
+    dataset = preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs)
+
+    # mapping = {
+    #     'artifact': 0,
+    #     'non-artifact': 1
+    # }
+
+    # create windows
+    windows_dataset = create_windows_dataset(dataset, window_size_samples, descriptions)
+
+    return windows_dataset
 
 
-
+# helper functions for loading TUH abnormal raw files from hierarchy
 def get_file_list(x):
     return [os.path.join(x, fname) for fname in os.listdir(x)]
-
 def get_id(x):
     return x.split('/')[-1]
 
