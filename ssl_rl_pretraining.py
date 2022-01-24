@@ -113,7 +113,7 @@ def load_sleep_staging_windowed_dataset(subjects, subject_size, n_jobs, window_s
     return windows_dataset
 
 
-def load_space_bambi_windowed_dataset(n_jobs, window_size_samples, high_cut_hz, sfreq, accepted_bads_ratio):
+def load_space_bambi_windowed_dataset(n_jobs, window_size_samples, low_cut_hz, high_cut_hz, sfreq, accepted_bads_ratio):
     print(f':: loading SPACE/BAMBI data')
 
     # space_bambi directory
@@ -137,7 +137,7 @@ def load_space_bambi_windowed_dataset(n_jobs, window_size_samples, high_cut_hz, 
     # preprocessing
     for raw in raws:
         mne.io.Raw.resample(raw, sfreq)   # resample
-        mne.io.Raw.filter(raw, l_freq=None, h_freq=high_cut_hz, n_jobs=n_jobs)    # high-pass filter
+        mne.io.Raw.filter(raw, l_freq=low_cut_hz, h_freq=high_cut_hz, n_jobs=n_jobs)    # high-pass filter
 
     # windowing
     windows_dataset = create_from_mne_raw(
@@ -338,8 +338,8 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, high_c
         print(':: loading PREPROCESSED windowed dataset: ', preprocessed_data)
         windows_dataset = load_windowed_data(preprocessed_data)
     else:
-        windows_dataset = load_sleep_staging_windowed_dataset(subjects, subject_size, n_jobs, window_size_samples, low_cut_hz, high_cut_hz, sfreq)
-        # windows_dataset = load_space_bambi_windowed_dataset(n_jobs, window_size_samples, high_cut_hz, sfreq, accepted_bads_ratio)
+        # windows_dataset = load_sleep_staging_windowed_dataset(subjects, subject_size, n_jobs, window_size_samples, low_cut_hz, high_cut_hz, sfreq)
+        windows_dataset = load_space_bambi_windowed_dataset(n_jobs, window_size_samples, low_cut_hz, high_cut_hz, sfreq, accepted_bads_ratio)
         # windows_dataset = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
 
         ### save fine-tuned model
