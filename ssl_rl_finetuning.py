@@ -52,6 +52,7 @@ from helper_funcs import HelperFuncs as hf
 from ContrastiveNet import *
 from RelativePositioningDataset import *
 from plot import Plot
+from segment import Segmenter
 
 
 # Authors: Hubert Banville <hubert.jbanville@gmail.com>
@@ -61,29 +62,28 @@ from plot import Plot
 
 ### Load model
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='tuh_abnormal', help='Dataset to be finetuned.')
+@click.option('--dataset_name', '--dataset', '-n', default='space_bambi', help='Dataset to be finetuned.')
 @click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
-# @click.option('--subject_size', default='some', help='sample (0-5), some (0-40), all (83)')
+# @click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
 @click.option('--random_state', default=87, help='Set a static random state so that the same result is generated everytime.')
 @click.option('--n_jobs', default=1, help='Number of subprocesses to run.')
 @click.option('--window_size_s', default=5, help='Window sizes in seconds.')
-# @click.option('--window_size_samples', default=500, help='Window sizes in milliseconds.')
 @click.option('--high_cut_hz', '--hfreq', '-h', default=30, help='High-pass filter frequency.')
 @click.option('--low_cut_hz', '--lfreq', '-l', default=0.5, help='Low-pass filter frequency.')
 @click.option('--sfreq', default=100, help='Sampling frequency of the input data.')
-# @click.option('--emb_size', default=100, help='Embedding size of the model (should correspond to sampling frequency).')
 @click.option('--lr', default=5e-3, help='Learning rate of the pretrained model.')
 @click.option('--batch_size', default=512, help='Batch size of the pretrained model.')
 @click.option('--n_epochs', default=12, help='Number of epochs while training the pretrained model.')
 @click.option('--n_channels', default=2, help='Number of channels.')
-# @click.option('--input_size_samples', default=100, help='Input size samples.')
 @click.option('--edge_bundling_plot', default=False, help='Plot UMAP connectivity plot with edge bundling (takes a long time).')
-# @click.option('--annotations', default=['T0', 'T1', 'T2'], help='Annotations for plotting.')
-@click.option('--annotations', default=['abnormal', 'normal'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['W', 'N1', 'N2', 'N3', 'R'], help='Annotations for plotting.')
+# @click.option('--annotations', default=['T0', 'T1', 'T2'], help='Annotations for plotting.')
+# @click.option('--annotations', default=['abnormal', 'normal'], help='Annotations for plotting.')
+# @click.option('--annotations', default=['abnormal', 'normal', 'scopolamine'], help='Annotations for plotting.')
+@click.option('--annotations', default=['artifact', 'non-artifact'], help='Annotations for plotting.')
 @click.option('--show_plots', '--show', default=False, help='Show plots.')
 @click.option('--load_feature_vectors', default=None, help='Load feature vectors passed through SSL model (input name of vector file).')
-@click.option('--load_latest_model', default=True, help='Load the latest pretrained model from the ssl_rl_pretraining.py script.')
+@click.option('--load_latest_model', default=False, help='Load the latest pretrained model from the ssl_rl_pretraining.py script.')
 
 
 def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cut_hz, high_cut_hz, sfreq, lr, batch_size, n_epochs, n_channels, edge_bundling_plot, annotations, show_plots, load_feature_vectors, load_latest_model):
@@ -99,21 +99,6 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
     set_random_seeds(seed=random_state, cuda=device == 'cuda')
 
     window_size_samples = window_size_s * sfreq
-    emb_size = sfreq
-
-    # instantiate classes
-
-    emb = SleepStagerChambon2018(
-        n_channels=n_channels,
-        sfreq=sfreq,
-        n_classes=emb_size,
-        n_conv_chs=16,
-        input_size_s=window_size_samples / sfreq,
-        dropout=0,
-        apply_batch_norm=True
-    )
-
-    print(emb)
 
     # load the pretrained model
     # (load the best model)
@@ -127,21 +112,20 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
     else:
         model = torch.load("models/pretrained/2021_12_16__10_23_49_sleep_staging_5s_windows_83_subjects_cpu_15_epochs_100hz.model")
 
-    # compare_models(model.emb, emb)
     print(model)
 
     # DOWNSTREAM TASK - FINE TUNING)
     if load_feature_vectors is None:
-        # windows_dataset = load_bci_data(subject_size, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         # windows_dataset = load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq)
         # data, descriptions = load_sleep_staging_raws()
-        windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
+        # windows_dataset = load_bci_data(subject_size, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         # windows_dataset = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
+        # windows_dataset = load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
+        windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
 
         ### Fine tune on Sleep staging SSL model
 
         # split by subject
-
         subjects = np.unique(windows_dataset.description['subject'])
         subj_train, subj_test = train_test_split(
             subjects, test_size=0.4, random_state=random_state)
@@ -175,7 +159,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
 
         # Initialize the logistic regression model
         log_reg = LogisticRegression(
-            penalty='l2', C=1.0, class_weight='balanced', solver='sag',
+            penalty='l2', C=1.0, class_weight='balanced', solver='newton-cg',
             multi_class='multinomial', random_state=random_state)
         clf_pipe = make_pipeline(StandardScaler(), log_reg)
 
@@ -363,8 +347,7 @@ def load_sleep_staging_raws():
 
     return raws, None
 
-
-def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
+def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s):
     print(':: loading SPACE/BAMBI data')
 
     # space_bambi directory
@@ -387,32 +370,111 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sa
         if i > 5:
             break
 
-    print(raws)
-
-    descriptions = []
-
-    for subject_id, raw in enumerate(raws):
-        descriptions += [{"subject": subject_id}]
-
     # preprocess dataset
     dataset = preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs)
 
-    # mapping = {
-    #     'artifact': 0,
-    #     'non-artifact': 1
-    # }
+    # segment dataset recordings into windows and add descriptions
+    segments, descriptions = [], []
+    segmenter = Segmenter(window_size=window_size_s, window_overlap=0.5, cutoff_length=0.1)
+    for subject_id, raw in enumerate(dataset):
+        segments += [segmenter.segment(raw)]
+        descriptions += [{"subject": subject_id, "recording": raw}]
+
+
+    # base_datasets = [BaseDataset(raw, desc) for raw, desc in zip(dataset, descriptions)]
+    # windows_dataset = BaseConcatDataset(base_datasets)
+
+    
+    from braindecode.datasets.base import WindowsDataset, BaseConcatDataset
+
+    windows_ds_list = []
+    for i, x in enumerate(descriptions):
+        windows_ds_list += [WindowsDataset(segments[i], x)]
+    windows_dataset = BaseConcatDataset(windows_ds_list)
+
 
     # create windows
-    windows_dataset = create_windows_dataset(dataset, window_size_samples, descriptions)
+    # windows_dataset = create_windows_dataset(dataset, window_size_samples, descriptions)
 
     return windows_dataset
 
 
-# helper functions for loading TUH abnormal raw files from hierarchy
-def get_file_list(x):
-    return [os.path.join(x, fname) for fname in os.listdir(x)]
-def get_id(x):
-    return x.split('/')[-1]
+# load scopolamine dataset
+# also load abnormal dataset as sample for normal (and abnormal) classifcations
+def load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
+    from  mat73 import loadmat
+    import mne
+
+    print(':: loading SCOPOLAMINE data')
+
+    scop_dir = '/home/maligan/Documents/VU/Year_2/M.Sc._Thesis_[X_400285]/my_thesis/code/ssl_thesis/data/scopolamine/mats/raws/'
+
+    mats = os.listdir(scop_dir)
+
+    scp_raws, scp_desc = [], []
+    info = mne.create_info(ch_names=['Fpz-cz', 'Pz-Oz'], ch_types=['eeg']*2, sfreq=1012)
+
+    # creating scopolamine raw data
+    for i, mat in enumerate(mats):
+        print(mat)
+        # select columns 3 and 4 (Fpz-Cz, and Pz-Oz respectively) and convert to microvolts
+        x = loadmat(scop_dir + mat)['RawSignal'][:, [2,3]].T / 100000
+        raw = mne.io.RawArray(x, info)
+        scp_raws += [raw.set_annotations(mne.Annotations(onset=[0], duration=raw.times.max(), description=['scopolamine']))]
+        scp_desc += [{'subject': 1, 'recording': i}]
+
+    # creating sample abnormal raw data
+    # ----------------------------- TEMP -------------------------------------------------
+
+    abn_dir = [
+        '/media/maligan/My Passport/msc_thesis/ssl_thesis/data/tuh_abnormal_data/eval/abnormal/007/00000768/s003_2012_04_06/00000768_s003_t000.edf_2_channels.fif',
+        '/media/maligan/My Passport/msc_thesis/ssl_thesis/data/tuh_abnormal_data/eval/abnormal/011/00001154/s007_2012_07_25/00001154_s007_t000.edf_2_channels.fif'
+    ]
+    norm_dir = [
+        '/media/maligan/My Passport/msc_thesis/ssl_thesis/data/tuh_abnormal_data/eval/normal/006/00000647/s002_2009_09_21/00000647_s002_t000.edf_2_channels.fif',
+        '/media/maligan/My Passport/msc_thesis/ssl_thesis/data/tuh_abnormal_data/eval/normal/013/00001355/s003_2009_12_08/00001355_s003_t000.edf_2_channels.fif'
+    ]
+    
+
+    # only 1 rec per subject (temporary)
+    def make_raws(_class, dataset=[], descriptions=[]):
+        for i, path in enumerate(abn_dir):
+            raw = mne.io.read_raw_fif(path)
+            raw = raw.set_annotations(mne.Annotations(onset=[0], duration=raw.times.max(), description=[_class]))
+            dataset.append(raw)
+            descriptions += [{'subject': len(descriptions)+1, 'recording': 1}]
+
+        return dataset, descriptions
+        
+    dataset, descriptions = make_raws('abnormal')
+    dataset, descriptions = make_raws('normal', dataset, descriptions)
+
+    dataset += scp_raws
+    descriptions += scp_desc
+
+    # -----------------------------------------------------------------------------------
+
+    for i, x in enumerate(dataset):
+        print(dataset[i], descriptions[i])
+
+
+    # preprocess dataset
+    dataset = preprocess_raws(dataset, sfreq, low_cut_hz, high_cut_hz, n_jobs)
+
+    mapping = {
+        'abnormal': 0,
+        'normal': 1,
+        'scopolamine': 2
+    }
+
+    # create windows
+    windows_dataset = create_windows_dataset(dataset, window_size_samples, descriptions, mapping)
+
+    return windows_dataset
+
+
+
+
 
 
 def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
@@ -422,22 +484,22 @@ def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sampl
 
     # build data dictionary
     annotations = {}
-    for annotation in get_file_list(data_dir):
+    for annotation in hf.get_file_list(data_dir):
         subjects = {}
-        for subject in get_file_list(annotation):
+        for subject in hf.get_file_list(annotation):
             recordings = {}
-            for recording in get_file_list(subject):
+            for recording in hf.get_file_list(subject):
                 dates = {}
-                for date in get_file_list(recording):
-                    for raw_path in get_file_list(date):
-                        if '_2_channels.fif' in get_id(raw_path):
+                for date in hf.get_file_list(recording):
+                    for raw_path in hf.get_file_list(date):
+                        if '_2_channels.fif' in hf.get_id(raw_path):
                             break
                         else:
                             pass
-                    dates[get_id(date)] = raw_path
-                recordings[get_id(recording)] = dates
-            subjects[get_id(subject)] = recordings
-        annotations[get_id(annotation)] = subjects
+                    dates[hf.get_id(date)] = raw_path
+                recordings[hf.get_id(recording)] = dates
+            subjects[hf.get_id(subject)] = recordings
+        annotations[hf.get_id(annotation)] = subjects
     
 
     df = pd.json_normalize(annotations, sep='_').T
@@ -501,7 +563,6 @@ def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sampl
 
 
 
-
 def preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs):
     print(':: PREPROCESSING RAWS')
     print(f'--resample {sfreq}')
@@ -537,7 +598,6 @@ def create_windows_dataset(raws, window_size_samples, descriptions=None, mapping
     preprocess(windows_dataset, [Preprocessor(zscore)])
 
     return windows_dataset
-
 
 
 if __name__ == '__main__':
