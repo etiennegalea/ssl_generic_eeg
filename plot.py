@@ -95,7 +95,7 @@ class Plot:
         colors = cm.get_cmap('viridis', 5)(range(5))
         for i, stage in enumerate(annotations):
             mask = y == i
-            ax.scatter(umap_components[mask, 0], umap_components[mask, 1], s=40, alpha=0.7, label=stage)
+            ax.scatter(umap_components[mask, 0], umap_components[mask, 1], s=20, alpha=0.7, label=stage)
         ax.legend()
 
         ax.set_title(components_titles[0])
@@ -138,6 +138,6 @@ class Plot:
             width=850,
             height=850
         )
-        fig_3d.update_traces(marker_size=3)
+        fig_3d.update_traces(marker_size=2)
         fig_3d.write_html(f'plots/{self.date}_UMAP_3d_{self.metadata_string}.html')
         print(':: 3d UMAP saved')

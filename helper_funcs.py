@@ -1,5 +1,7 @@
 import torch
 from datetime import date, datetime
+import os
+from scipy.io import loadmat
 
 class HelperFuncs():
 
@@ -48,3 +50,10 @@ class HelperFuncs():
             print(':: CUDA unavailable - using CPU')
             
         return device
+
+    
+    # helper functions for loading TUH abnormal raw files from hierarchy
+    def get_file_list(x):
+        return [os.path.join(x, fname) for fname in os.listdir(x)]
+    def get_id(x):
+        return x.split('/')[-1]
