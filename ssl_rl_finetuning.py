@@ -62,9 +62,9 @@ from segment import Segmenter
 
 ### Load model
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='space_bambi', help='Dataset to be finetuned.')
-@click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
-# @click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
+@click.option('--dataset_name', '--dataset', '-n', default='sleep_staging', help='Dataset to be finetuned.')
+@click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
+# @click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
 @click.option('--random_state', default=87, help='Set a static random state so that the same result is generated everytime.')
 @click.option('--n_jobs', default=1, help='Number of subprocesses to run.')
 @click.option('--window_size_s', default=5, help='Window sizes in seconds.')
@@ -73,20 +73,19 @@ from segment import Segmenter
 @click.option('--sfreq', default=100, help='Sampling frequency of the input data.')
 @click.option('--lr', default=5e-3, help='Learning rate of the pretrained model.')
 @click.option('--batch_size', default=512, help='Batch size of the pretrained model.')
-@click.option('--n_epochs', default=12, help='Number of epochs while training the pretrained model.')
 @click.option('--n_channels', default=2, help='Number of channels.')
 @click.option('--edge_bundling_plot', default=False, help='Plot UMAP connectivity plot with edge bundling (takes a long time).')
-# @click.option('--annotations', default=['W', 'N1', 'N2', 'N3', 'R'], help='Annotations for plotting.')
+@click.option('--annotations', default=['W', 'N1', 'N2', 'N3', 'R'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['T0', 'T1', 'T2'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['abnormal', 'normal'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['abnormal', 'normal', 'scopolamine'], help='Annotations for plotting.')
-@click.option('--annotations', default=['artifact', 'non-artifact'], help='Annotations for plotting.')
+# @click.option('--annotations', default=['artifact', 'non-artifact'], help='Annotations for plotting.')
 @click.option('--show_plots', '--show', default=False, help='Show plots.')
 @click.option('--load_feature_vectors', default=None, help='Load feature vectors passed through SSL model (input name of vector file).')
 @click.option('--load_latest_model', default=False, help='Load the latest pretrained model from the ssl_rl_pretraining.py script.')
 
 
-def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cut_hz, high_cut_hz, sfreq, lr, batch_size, n_epochs, n_channels, edge_bundling_plot, annotations, show_plots, load_feature_vectors, load_latest_model):
+def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cut_hz, high_cut_hz, sfreq, lr, batch_size, n_channels, edge_bundling_plot, annotations, show_plots, load_feature_vectors, load_latest_model):
     print(':: STARTING MAIN ::')
 
     # print all parameter vars
@@ -116,12 +115,12 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
 
     # DOWNSTREAM TASK - FINE TUNING)
     if load_feature_vectors is None:
-        # windows_dataset = load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq)
+        windows_dataset = load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq)
         # data, descriptions = load_sleep_staging_raws()
         # windows_dataset = load_bci_data(subject_size, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         # windows_dataset = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         # windows_dataset = load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
-        windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
+        # windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
 
         ### Fine tune on Sleep staging SSL model
 
@@ -191,12 +190,16 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         y = np.concatenate([v[1] for k, v in data.items()])
 
         ### save fine-tuned model
-        with open(f'models/finetuned/{hf.get_datetime()}_{metadata_string}.pkl', 'wb+') as f:
+        dir = 'models/finetuned/'
+        hf.check_dir(dir)
+        with open(f'{dir}{hf.get_datetime()}_{metadata_string}.pkl', 'wb+') as f:
             pickle.dump(clf_pipe, f)
         f.close()
 
         ### save feature vectors
-        with open(f'data/feature_vectors/{hf.get_datetime()}_{metadata_string}.pkl', 'wb+') as f:
+        dir = 'data/feature_vectors/'
+        hf.check_dir(dir)
+        with open(f'{dir}{hf.get_datetime()}_{metadata_string}.pkl', 'wb+') as f:
             pickle.dump([X,y], f)
         f.close()
 
@@ -219,7 +222,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
     ### Visualizing clusters
 
     # init plotting object
-    p = Plot(metadata_string, show=show_plots)
+    p = Plot(dataset_name, metadata_string, show=show_plots)
 
     p.plot_UMAP(X, y, annotations)
     # p.plot_UMAP_connectivity(X)

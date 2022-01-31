@@ -293,11 +293,11 @@ def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sampl
 
 
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='tuh_abnormal', help='Dataset to be pretrained.')
+@click.option('--dataset_name', '--dataset', '-n', default='sleep_staging', help='Dataset to be pretrained.')
 @click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
 @click.option('--random_state', default=87, help='Set a static random state so that the same result is generated everytime.')
 @click.option('--n_jobs', default=1, help='Number of subprocesses to run.')
-@click.option('--window_size_s', default=2, help='Window sizes in seconds.')
+@click.option('--window_size_s', default=5, help='Window sizes in seconds.')
 # @click.option('--window_size_samples', default=3000, help='Window sizes in milliseconds.')
 @click.option('--high_cut_hz', default=30, help='High-pass filter frequency.')
 @click.option('--low_cut_hz', default=0.5, help='Low-pass filter frequency.')
@@ -338,12 +338,14 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, high_c
         print(':: loading PREPROCESSED windowed dataset: ', preprocessed_data)
         windows_dataset = load_windowed_data(preprocessed_data)
     else:
-        # windows_dataset = load_sleep_staging_windowed_dataset(subjects, subject_size, n_jobs, window_size_samples, low_cut_hz, high_cut_hz, sfreq)
-        windows_dataset = load_space_bambi_windowed_dataset(n_jobs, window_size_samples, low_cut_hz, high_cut_hz, sfreq, accepted_bads_ratio)
+        windows_dataset = load_sleep_staging_windowed_dataset(subjects, subject_size, n_jobs, window_size_samples, low_cut_hz, high_cut_hz, sfreq)
+        # windows_dataset = load_space_bambi_windowed_dataset(n_jobs, window_size_samples, low_cut_hz, high_cut_hz, sfreq, accepted_bads_ratio)
         # windows_dataset = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
 
-        ### save fine-tuned model
-        with open(f'/home/maligan/Documents/VU/Year_2/M.Sc._Thesis_[X_400285]/my_thesis/code/ssl_thesis/data/preprocessed/{hf.get_datetime()}_{metadata_string}.pkl', 'wb+') as f:
+        ### save windows
+        dir = '/home/maligan/Documents/VU/Year_2/M.Sc._Thesis_[X_400285]/my_thesis/code/ssl_thesis/data/preprocessed/'
+        hf.check_dir(dir)
+        with open(f'{dir}{hf.get_datetime()}_{metadata_string}.pkl', 'wb+') as f:
             pickle.dump(windows_dataset, f)
         f.close()
         print(':: Data loaded, preprocessed and windowed.')
@@ -445,7 +447,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, high_c
     os.remove('./params.pt')  # Delete parameters file
 
     ## Visualizing the results
-    p = Plot(metadata_string)
+    p = Plot(dataset_name, metadata_string)
     p.plot_acc(clf.history.to_list())
 
 
@@ -464,11 +466,15 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, high_c
     class_report = classification_report(y_true, y_pred)
     print(classification_report(y_true, y_pred))
     # save report
-    with open(f'classification_reports/pretrained/{hf.get_datetime()}_class_report_{metadata_string}.txt', "w") as f:
+    dir = 'classification_reports/pretrained/'
+    hf.check_dir(dir)
+    with open(f'{dir}{hf.get_datetime()}_class_report_{metadata_string}.txt', "w") as f:
         f.write(pprint.pformat(class_report, indent=4, sort_dicts=False))
 
     ### Save model
-    model_name = f'models/pretrained/{hf.get_datetime()}_{metadata_string}.model'
+    dir = './models/pretrained/'
+    hf.check_dir(dir)
+    model_name = f'{dir}{hf.get_datetime()}_{metadata_string}.model'
     torch.save(model, model_name)
 
     print(f'Model trained ~ {os.path.dirname(os.path.abspath(__file__))}/{model_name}')

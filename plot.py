@@ -16,16 +16,18 @@ from helper_funcs import HelperFuncs as hf
 
 class Plot:
     
-    def __init__(self, metadata_string, save=True, show=False):
+    def __init__(self, dataset_name, metadata_string, save=True, show=False):
         self.save = save
         self.show = show
+        self.dataset_name = dataset_name
         self.metadata_string = metadata_string
         self.date = hf.get_datetime(dateonly=True)
 
     def _plot(self, figure, title):
+        hf.check_dir(f'plots/{self.dataset_name}')
         # save fig
         if self.save:
-            figure.savefig(f'plots/{self.date}_{title}_{self.metadata_string}.png')
+            figure.savefig(f'plots/{self.dataset_name}/{self.date}_{title}_{self.metadata_string}.png')
         # show fig
         if self.show:
             figure.show()
@@ -139,5 +141,6 @@ class Plot:
             height=850
         )
         fig_3d.update_traces(marker_size=2)
-        fig_3d.write_html(f'plots/{self.date}_UMAP_3d_{self.metadata_string}.html')
+        hf.check_dir(f'plots/{self.dataset_name}')
+        fig_3d.write_html(f'plots/{self.dataset_name}/{self.date}_UMAP_3d_{self.metadata_string}.html')
         print(':: 3d UMAP saved')

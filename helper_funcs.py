@@ -2,6 +2,7 @@ import torch
 from datetime import date, datetime
 import os
 from scipy.io import loadmat
+from pathlib import Path
 
 class HelperFuncs():
 
@@ -57,3 +58,7 @@ class HelperFuncs():
         return [os.path.join(x, fname) for fname in os.listdir(x)]
     def get_id(x):
         return x.split('/')[-1]
+
+    # check for existing folder/s and create them if directory does not exist
+    def check_dir(dir):
+        Path(dir).mkdir(parents=True, exist_ok=True)
