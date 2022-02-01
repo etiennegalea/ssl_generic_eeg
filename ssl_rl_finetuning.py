@@ -83,9 +83,10 @@ from segment import Segmenter
 @click.option('--show_plots', '--show', default=False, help='Show plots.')
 @click.option('--load_feature_vectors', default=None, help='Load feature vectors passed through SSL model (input name of vector file).')
 @click.option('--load_latest_model', default=False, help='Load the latest pretrained model from the ssl_rl_pretraining.py script.')
+@click.option('--fully_supervised', default=False, help='Train a fully-supervised model for comparison with the downstream task.')
 
 
-def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cut_hz, high_cut_hz, sfreq, lr, batch_size, n_channels, edge_bundling_plot, annotations, show_plots, load_feature_vectors, load_latest_model):
+def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cut_hz, high_cut_hz, sfreq, lr, batch_size, n_channels, edge_bundling_plot, annotations, show_plots, load_feature_vectors, load_latest_model, fully_supervised):
     print(':: STARTING MAIN ::')
 
     # print all parameter vars
@@ -229,6 +230,43 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
     if edge_bundling_plot:
         p.plot_UMAP_connectivity(X, edge_bundling=True)
     p.plot_UMAP_3d(X, y)
+
+
+
+    ### Train a fully-supervised logistic regresion for comparison and evaluation
+    if fully_supervised:
+        # re-init logistic regression
+        log_reg = LogisticRegression(
+            penalty='l2', C=1.0, class_weight='balanced', solver='newton-cg',
+            multi_class='multinomial', random_state=random_state)
+
+        
+
+        # Fit and score the logistic regression
+        clf_pipe.fit(*data['train'])
+        train_y_pred = clf_pipe.predict(data['train'][0])
+        valid_y_pred = clf_pipe.predict(data['valid'][0])
+        test_y_pred = clf_pipe.predict(data['test'][0])
+        # test_ds_y_pred = clf_pipe.predict(test_ds_data[0])
+
+        train_bal_acc = balanced_accuracy_score(data['train'][1], train_y_pred)
+        valid_bal_acc = balanced_accuracy_score(data['valid'][1], valid_y_pred)
+        test_bal_acc = balanced_accuracy_score(data['test'][1], test_y_pred)
+        # test_ds_acc = balanced_accuracy_score(test_ds_data[1], test_ds_y_pred)
+
+        print('Sleep staging performance with logistic regression:')
+        print(f'Train bal acc: {train_bal_acc:0.4f}')
+        print(f'Valid bal acc: {valid_bal_acc:0.4f}')
+        print(f'Test bal acc: {test_bal_acc:0.4f}')
+        # print(f'Test bal acc: {test_ds_acc:0.4f}')
+
+        print('Results on test set:')
+        print(confusion_matrix(data['test'][1], test_y_pred))
+        print(classification_report(data['test'][1], test_y_pred))
+
+
+        
+
 
 
 # load BCI data
