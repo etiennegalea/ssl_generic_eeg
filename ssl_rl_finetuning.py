@@ -39,6 +39,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import train_test_split
 
+from  mat73 import loadmat
+
 # visualizations
 
 from sklearn.decomposition import PCA
@@ -62,7 +64,7 @@ from segment import Segmenter
 
 ### Load model
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='sleep_staging', help='Dataset to be finetuned.')
+@click.option('--dataset_name', '--dataset', '-n', default='scopolamine', help='Dataset to be finetuned.')
 @click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
 # @click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
 @click.option('--random_state', default=87, help='Set a static random state so that the same result is generated everytime.')
@@ -80,6 +82,7 @@ from segment import Segmenter
 # @click.option('--annotations', default=['abnormal', 'normal'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['abnormal', 'normal', 'scopolamine'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['artifact', 'non-artifact'], help='Annotations for plotting.')
+@click.option('--annotations', default=['M01', 'M05', 'M11'], help='Annotations for plotting.')
 @click.option('--show_plots', '--show', default=False, help='Show plots.')
 @click.option('--load_feature_vectors', default=None, help='Load feature vectors passed through SSL model (input name of vector file).')
 @click.option('--load_latest_model', default=False, help='Load the latest pretrained model from the ssl_rl_pretraining.py script.')
@@ -116,11 +119,12 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
 
     # DOWNSTREAM TASK - FINE TUNING)
     if load_feature_vectors is None:
-        windows_dataset = load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq)
+        # windows_dataset = load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq)
         # data, descriptions = load_sleep_staging_raws()
         # windows_dataset = load_bci_data(subject_size, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         # windows_dataset = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
-        # windows_dataset = load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
+        # windows_dataset = load_scopolamine_abnormal_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
+        windows_dataset = load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         # windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
 
         ### Fine tune on Sleep staging SSL model
@@ -440,9 +444,78 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
     return windows_dataset
 
 
-# load scopolamine dataset
-# also load abnormal dataset as sample for normal (and abnormal) classifcations
+
+# load mats (for scopolamine dataset)
+def load_mats(path, info, classification, dataset, descriptions):
+    raws, desc = [], []
+
+    mats = os.listdir(path)
+    for i, mat in enumerate(mats):
+        print(mat)
+        # select columns 3 and 4 (Fpz-Cz, and Pz-Oz respectively) and convert to microvolts
+        x = loadmat(path + mat)['RawSignal'][:, [2,3]].T / 100000
+        raw = mne.io.RawArray(x, info)
+            
+        # subject
+        subject = int(mat.split('.')[1][2:])
+        # recording (occasion)
+        recording = int(mat.split('.')[-2].split('M')[0][1:])
+        # treatment period
+        treatment_period = int(mat.split('.')[-2].split('M')[-1])
+
+        # if even (not placebo)
+        if not recording&1:
+            raws += [raw.set_annotations(mne.Annotations(onset=[0], duration=raw.times.max(), description=[classification]))]
+            desc += [{'subject': subject, 'recording': recording, 'treatment_period': treatment_period}]
+            
+
+    dataset += raws
+    descriptions += desc
+
+    return dataset, descriptions
+
+# load scopolamine data
 def load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
+    print(':: loading SCOPOLAMINE data')
+
+    # 11 measurements times from 0.5 hrs to 8.5 hrs after Scopolamine (or placebo) administration
+    m01 = '/media/maligan/My Passport/msc_thesis/ssl_thesis/data/scopolamine/M01/'
+    m05 = '/media/maligan/My Passport/msc_thesis/ssl_thesis/data/scopolamine/M05/'
+    m11 = '/media/maligan/My Passport/msc_thesis/ssl_thesis/data/scopolamine/M11/'
+
+    dataset, descriptions = [], []
+    info = mne.create_info(ch_names=['Fpz-cz', 'Pz-Oz'], ch_types=['eeg']*2, sfreq=1012)
+
+    dataset, descriptions = load_mats(m01, info, 'm01', dataset, descriptions)
+    dataset, descriptions = load_mats(m05, info, 'm05', dataset, descriptions)
+    dataset, descriptions = load_mats(m11, info, 'm11', dataset, descriptions)
+
+
+    # preprocess dataset
+    dataset = preprocess_raws(dataset, sfreq, low_cut_hz, high_cut_hz, n_jobs)
+
+    mapping = {
+        'm01': 0,
+        'm05': 1,
+        'm11': 2
+    }
+
+    # shuffle raw_paths and descriptions
+    from sklearn.utils import shuffle
+    dataset, descriptions = shuffle(dataset, descriptions)
+
+
+    # create windows
+    windows_dataset = create_windows_dataset(dataset, window_size_samples, descriptions, mapping)
+
+    return windows_dataset
+
+
+
+
+
+# load scopolamine dataset w/ also load abnormal dataset as sample for normal (and abnormal) classifcations
+def load_scopolamine_abnormal_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
     from  mat73 import loadmat
     import mne
 
@@ -611,8 +684,8 @@ def preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs):
     print(f'--low_cut freq {low_cut_hz}')
 
     for raw in raws:
-        mne.io.Raw.resample(raw, sfreq)   # resample
-        mne.io.Raw.filter(raw, l_freq=low_cut_hz, h_freq=high_cut_hz, n_jobs=n_jobs)    # high-pass filter
+        raw.filter(l_freq=low_cut_hz, h_freq=high_cut_hz, n_jobs=n_jobs)    # high-pass filter
+        raw.resample(sfreq)   # resample
 
     return raws
 

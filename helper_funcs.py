@@ -1,7 +1,6 @@
 import torch
 from datetime import date, datetime
 import os
-from scipy.io import loadmat
 from pathlib import Path
 
 class HelperFuncs():

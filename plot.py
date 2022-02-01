@@ -21,7 +21,7 @@ class Plot:
         self.show = show
         self.dataset_name = dataset_name
         self.metadata_string = metadata_string
-        self.date = hf.get_datetime(dateonly=True)
+        self.date = hf.get_datetime(dateonly=False)
 
     def _plot(self, figure, title):
         hf.check_dir(f'plots/{self.dataset_name}')
