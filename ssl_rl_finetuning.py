@@ -77,7 +77,7 @@ from segment import Segmenter
 @click.option('--batch_size', default=512, help='Batch size of the pretrained model.')
 @click.option('--n_channels', default=2, help='Number of channels.')
 @click.option('--edge_bundling_plot', default=False, help='Plot UMAP connectivity plot with edge bundling (takes a long time).')
-@click.option('--annotations', default=['W', 'N1', 'N2', 'N3', 'R'], help='Annotations for plotting.')
+# @click.option('--annotations', default=['W', 'N1', 'N2', 'N3', 'R'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['T0', 'T1', 'T2'], help='Annotations for plotting.')
 @click.option('--annotations', default=['abnormal', 'normal'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['artifact', 'non-artifact'], help='Annotations for plotting.')
@@ -230,6 +230,8 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
     # init plotting object
     p = Plot(dataset_name, metadata_string, show=show_plots)
 
+    p.plot_PCA(X, y, annotations)
+    p.plot_TSNE(X, y, annotations)
     p.plot_UMAP(X, y, annotations)
     # p.plot_UMAP_connectivity(X)
     if edge_bundling_plot:
