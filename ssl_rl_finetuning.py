@@ -64,7 +64,7 @@ from segment import Segmenter
 
 ### Load model
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='tuh_abnormal', help='Dataset to be finetuned.')
+@click.option('--dataset_name', '--dataset', '-n', default='abnormal_noise_test', help='Dataset to be finetuned.')
 @click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
 # @click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
 @click.option('--random_state', default=87, help='Set a static random state so that the same result is generated everytime.')
@@ -79,10 +79,12 @@ from segment import Segmenter
 @click.option('--edge_bundling_plot', default=False, help='Plot UMAP connectivity plot with edge bundling (takes a long time).')
 # @click.option('--annotations', default=['W', 'N1', 'N2', 'N3', 'R'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['T0', 'T1', 'T2'], help='Annotations for plotting.')
-@click.option('--annotations', default=['abnormal', 'normal'], help='Annotations for plotting.')
+# @click.option('--annotations', default=['abnormal', 'normal'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['artifact', 'non-artifact'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['M01', 'M05', 'M11'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['M01', 'test'], help='Annotations for plotting.')
+# @click.option('--annotations', default=['white_noise', 'normal_noise'], help='Annotations for plotting.')
+@click.option('--annotations', default=['abnormal', 'normal', 'white_noise'], help='Annotations for plotting.')
 @click.option('--show_plots', '--show', default=False, help='Show plots.')
 @click.option('--load_feature_vectors', default=None, help='Load feature vectors passed through SSL model (input name of vector file).')
 @click.option('--load_latest_model', default=False, help='Load the latest pretrained model from the ssl_rl_pretraining.py script.')
@@ -122,11 +124,13 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         # windows_dataset = load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq)
         # data, descriptions = load_sleep_staging_raws()
         # windows_dataset = load_bci_data(subject_size, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
-        windows_dataset = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
+        # windows_dataset = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         # windows_dataset = load_scopolamine_abnormal_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         # windows_dataset = load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         # windows_dataset = load_scopolamine_test_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         # windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
+        # windows_dataset = load_generated_noisy_signals(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
+        windows_dataset = load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
 
         ### Fine tune on Sleep staging SSL model
 
@@ -676,12 +680,12 @@ def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sampl
     for id in abnormal_subjects:
         for recording in annotations['abnormal'][id].values():
             for x in recording.keys():
-                abnormal_descriptions += [{'subject': id, 'recording': x}]
+                abnormal_descriptions += [{'subject': int(id), 'recording': x}]
                 classification += ['abnormal']
     for id in normal_subjects:
         for recording in annotations['normal'][id].values():
             for x in recording.keys():
-                normal_descriptions += [{'subject': id, 'recording': x}]
+                normal_descriptions += [{'subject': int(id), 'recording': x}]
                 classification += ['normal']
 
     descriptions = abnormal_descriptions + normal_descriptions
@@ -720,6 +724,127 @@ def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sampl
 
     return windows_dataset
 
+
+# load simulated noisy signals (white noise and sin waves with normal noise) for testing model
+def load_generated_noisy_signals(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
+    print(':: loading TUH abnormal data')
+
+    dataset, descriptions = [], []
+    for i in range(50):
+        # alternate between generating normal noise and white noise
+        dataset += [hf.generate_noisy_raws(n_times=50000) if i&1 else hf.generate_white_noise_raws(n_times=50000)]
+        descriptions += [{'subject': i}]
+            
+    # preprocess dataset
+    dataset = preprocess_raws(dataset, sfreq, low_cut_hz, high_cut_hz, n_jobs)
+
+    mapping = {
+        'white_noise': 0,
+        'normal_noise': 1
+    }
+
+    # create windows
+    windows_dataset = create_windows_dataset(dataset, window_size_samples, descriptions, mapping)
+
+    return windows_dataset
+
+
+def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
+    print(':: loading TUH abnormal data + white noise')
+
+    data_dir = '/media/maligan/My Passport/msc_thesis/ssl_thesis/data/tuh_abnormal_data/eval/'
+
+    # build data dictionary
+    annotations = {}
+    for annotation in hf.get_file_list(data_dir):
+        subjects = {}
+        for subject in hf.get_file_list(annotation):
+            recordings = {}
+            for recording in hf.get_file_list(subject):
+                dates = {}
+                for date in hf.get_file_list(recording):
+                    for raw_path in hf.get_file_list(date):
+                        if '_2_channels.fif' in hf.get_id(raw_path):
+                            break
+                        else:
+                            pass
+                    dates[hf.get_id(date)] = raw_path
+                recordings[hf.get_id(recording)] = dates
+            subjects[hf.get_id(subject)] = recordings
+        annotations[hf.get_id(annotation)] = subjects
+    
+
+    df = pd.json_normalize(annotations, sep='_').T
+
+    # paths list
+    raw_paths = [df.iloc[i][0] for i in range(len(df))]
+
+    # define abnormal and normal subjects
+    
+    abnormal_subjects = annotations['abnormal'].keys()
+    normal_subjects = annotations['normal'].keys()
+
+    # define descriptions (recoding per subject)
+    abnormal_descriptions, normal_descriptions, classification = [], [], []
+    for id in abnormal_subjects:
+        for recording in annotations['abnormal'][id].values():
+            for x in recording.keys():
+                abnormal_descriptions += [{'subject': int(id), 'recording': x}]
+                classification += ['abnormal']
+    for id in normal_subjects:
+        for recording in annotations['normal'][id].values():
+            for x in recording.keys():
+                normal_descriptions += [{'subject': int(id), 'recording': x}]
+                classification += ['normal']
+
+    descriptions = abnormal_descriptions + normal_descriptions
+
+
+    # shuffle raw_paths and descriptions
+    from sklearn.utils import shuffle
+    dataset, descriptions, classification = shuffle(raw_paths, descriptions, classification)
+
+
+    # limiters
+    raw_paths = raw_paths[:50]
+    descriptions = descriptions[:50]
+    classification = classification[:50]
+
+    # load data and set annotations
+    dataset = []
+    for i, path in enumerate(raw_paths):
+        _class = classification[i]
+        raw = mne.io.read_raw_fif(path, preload=True)
+        raw = raw.set_annotations(mne.Annotations(onset=[0], duration=raw.times.max(), description=[_class]))
+        dataset.append(raw)
+
+    # -------------------- NOISE GEN --------------------------------
+
+    for i in range(len(raw_paths)):
+        dataset += [hf.generate_white_noise_raws(n_times=50000)]
+        descriptions += [{'subject': i}]
+
+
+    # ---------------------------------------------------------------
+
+    # reshuffle with white noise added in dataset
+    dataset, descriptions = shuffle(dataset, descriptions)
+
+
+
+    # preprocess dataset
+    dataset = preprocess_raws(dataset, sfreq, low_cut_hz, high_cut_hz, n_jobs)
+
+    mapping = {
+        'abnormal': 0,
+        'normal': 1,
+        'white_noise': 2
+    }
+
+    # create windows
+    windows_dataset = create_windows_dataset(dataset, window_size_samples, descriptions, mapping)
+
+    return windows_dataset
 
 
 def preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs):

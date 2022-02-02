@@ -2,6 +2,9 @@ import torch
 from datetime import date, datetime
 import os
 from pathlib import Path
+import numpy as np
+import mne
+
 
 class HelperFuncs():
 
@@ -61,3 +64,54 @@ class HelperFuncs():
     # check for existing folder/s and create them if directory does not exist
     def check_dir(dir):
         Path(dir).mkdir(parents=True, exist_ok=True)
+
+    # generate simulated noisy signals (sinusoidal waves w/ noise)
+    def generate_noisy_raws(
+        ch_names=['SIM0001', 'SIM0002'],
+        ch_types=['eeg']*2,
+        sfreq=100.0,
+        n_times=5000,
+        seed=42,
+        wave_hz=50.0,
+        stage='normal_noise'
+        ):
+        
+        rng = np.random.RandomState(seed)
+        noise = rng.randn(len(ch_names), n_times)
+
+        # Add a specified (50hz) sinusoidal burst to the noise and ramp it.
+        t = np.arange(n_times, dtype=np.float64) / sfreq
+        signal = np.sin(np.pi * 2. * wave_hz * t)  # wave_hz sinusoid signal
+        signal[np.logical_or(t < wave_hz-0.5, t > wave_hz+0.5)] = 0.  # Hard windowing
+        on_time = np.logical_and(t >= wave_hz-0.5, t <= wave_hz+0.5)
+        signal[on_time] *= np.hanning(on_time.sum())  # Ramping
+        data = noise + signal
+
+        info = mne.create_info(ch_names, sfreq, ch_types)
+        raw = mne.io.RawArray(data/100000, info)
+        raw = raw.set_annotations(mne.Annotations(onset=[0], duration=raw.times.max(), description=[stage]))
+
+        return raw
+
+    # generate simulated white noise signals
+    def generate_white_noise_raws(
+        ch_names=['SIM0001', 'SIM0002'],
+        ch_types=['eeg']*2,
+        sfreq=100.0,
+        n_times=5000,
+        seed=42,
+        wave_hz=50.0,
+        stage='white_noise',
+        bound=1
+    ):
+
+        noise = np.array([
+            np.random.uniform(wave_hz-bound, wave_hz+bound, size=n_times), 
+            np.random.uniform(wave_hz-bound, wave_hz+bound, size=n_times)
+        ])
+
+        info = mne.create_info(ch_names, sfreq, ch_types)
+        raw = mne.io.RawArray(noise/100000, info)
+        raw = raw.set_annotations(mne.Annotations(onset=[0], duration=raw.times.max(), description=[stage]))
+
+        return raw

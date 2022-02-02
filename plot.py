@@ -88,10 +88,10 @@ class Plot:
         n_stages = len(annotations)
 
         fig, ax = plt.subplots()
-        colors = cm.get_cmap('viridis', n_stages)(range(n_stages))
+        colors = cm.get_cmap('plasma', n_stages)(range(n_stages))
         for i, stage in enumerate(annotations):
             mask = y == i
-            ax.scatter(components[mask, 0], components[mask, 1], s=10, alpha=0.7,
+            ax.scatter(components[mask, 0], components[mask, 1], s=2, alpha=0.7,
                     color=colors[i], label=stage)
         ax.legend()
 
@@ -110,10 +110,10 @@ class Plot:
         n_stages = len(annotations)
 
         fig, ax = plt.subplots()
-        colors = cm.get_cmap('viridis', n_stages)(range(n_stages))
+        colors = cm.get_cmap('plasma', n_stages)(range(n_stages))
         for i, stage in enumerate(annotations):
             mask = y == i
-            ax.scatter(components[mask, 0], components[mask, 1], s=10, alpha=0.7,
+            ax.scatter(components[mask, 0], components[mask, 1], s=2, alpha=0.7,
                     color=colors[i], label=stage)
         ax.legend()
 
@@ -131,10 +131,10 @@ class Plot:
         n_stages = len(annotations)
 
         fig, ax = plt.subplots()
-        colors = cm.get_cmap('viridis', n_stages)(range(n_stages))
+        colors = cm.get_cmap('plasma', n_stages)(range(n_stages))
         for i, stage in enumerate(annotations):
             mask = y == i
-            ax.scatter(umap_components[mask, 0], umap_components[mask, 1], s=10, alpha=0.7,
+            ax.scatter(umap_components[mask, 0], umap_components[mask, 1], s=2, alpha=0.7,
             color=colors[i], label=stage)
         ax.legend()
 
