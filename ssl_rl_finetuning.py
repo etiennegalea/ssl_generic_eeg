@@ -453,21 +453,14 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
 
 
 # load mats (for scopolamine dataset)
-def load_mats(path, info, classification, dataset, descriptions, test=False):
+def load_mats(path, info, classification, dataset, descriptions):
     raws, desc = [], []
 
     mats = os.listdir(path)
     for i, mat in enumerate(mats):
         print(mat)
         # select columns 3 and 4 (Fpz-Cz, and Pz-Oz respectively) and convert to microvolts
-        if not test:
-            x = loadmat(path + mat)['RawSignal'][:, [2,3]].T / 100000
-
-        # Testing
-        else:
-            x = loadmat(path + mat)['RawSignal'][:, [2,3]].T / 1000
-            print(':: TESTING')
-
+        x = loadmat(path + mat)['RawSignal'][:, [2,3]].T / 100000
         raw = mne.io.RawArray(x, info)
             
         # subject
