@@ -276,8 +276,49 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         print(classification_report(data['test'][1], test_y_pred))
 
 
-        
 
+# ---------------------------------- PROCESSING FUNCTIONS ----------------------------------
+
+
+def preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs):
+    print(':: PREPROCESSING RAWS')
+    print(f'--resample {sfreq}')
+    print(f'--high_cut freq {high_cut_hz}')
+    print(f'--low_cut freq {low_cut_hz}')
+
+    for raw in raws:
+        raw = raw.filter(l_freq=low_cut_hz, h_freq=high_cut_hz, n_jobs=n_jobs)    # filtering
+        raw = raw.resample(sfreq)   # resample
+
+    return raws
+
+
+def create_windows_dataset(raws, window_size_samples, descriptions=None, mapping=None):
+    print(f':: Creating windows of size: {window_size_samples}')
+
+    windows_dataset = create_from_mne_raw(
+        raws,
+        trial_start_offset_samples=0,
+        trial_stop_offset_samples=0,
+        window_size_samples=window_size_samples,
+        window_stride_samples=window_size_samples,
+        drop_last_window=True,
+        accepted_bads_ratio=0.0,
+        drop_bad_windows=True,
+        on_missing='ignore',
+        descriptions=descriptions,
+        mapping=mapping,
+        # preload=True
+    )
+
+    # channel-wise zscore normalization
+    preprocess(windows_dataset, [Preprocessor(zscore)])
+
+    return windows_dataset
+
+
+        
+# ---------------------------------- LOADING DATASETS ----------------------------------
 
 
 # load BCI data
@@ -336,6 +377,7 @@ def load_bci_data(subject_size, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_s
 
     return windows_dataset
 
+
 def load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq):
     print(f':: loading SLEEP STAGING data...')
 
@@ -383,6 +425,7 @@ def load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_sample
 
     return windows_dataset
 
+
 def load_sleep_staging_raws():
     print(':: loading SLEEP STAGING raws')
     raw_set = [
@@ -398,6 +441,7 @@ def load_sleep_staging_raws():
     # mne.io.RawArray(raws)
 
     return raws, None
+
 
 def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s):
     print(':: loading SPACE/BAMBI data')
@@ -518,7 +562,6 @@ def load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sa
     return windows_dataset
 
 
-
 # load scopolamine data
 def load_scopolamine_test_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
     print(':: loading SCOPOLAMINE data')
@@ -551,9 +594,6 @@ def load_scopolamine_test_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_si
     windows_dataset = create_windows_dataset(dataset, window_size_samples, descriptions, mapping)
 
     return windows_dataset
-
-
-
 
 
 # load scopolamine dataset w/ also load abnormal dataset as sample for normal (and abnormal) classifcations
@@ -627,10 +667,6 @@ def load_scopolamine_abnormal_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, windo
     windows_dataset = create_windows_dataset(dataset, window_size_samples, descriptions, mapping)
 
     return windows_dataset
-
-
-
-
 
 
 def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
@@ -839,42 +875,6 @@ def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size
 
     return windows_dataset
 
-
-def preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs):
-    print(':: PREPROCESSING RAWS')
-    print(f'--resample {sfreq}')
-    print(f'--high_cut freq {high_cut_hz}')
-    print(f'--low_cut freq {low_cut_hz}')
-
-    for raw in raws:
-        raw.filter(l_freq=low_cut_hz, h_freq=high_cut_hz, n_jobs=n_jobs)    # high-pass filter
-        raw.resample(sfreq)   # resample
-
-    return raws
-
-
-def create_windows_dataset(raws, window_size_samples, descriptions=None, mapping=None):
-    print(f':: Creating windows of size: {window_size_samples}')
-
-    windows_dataset = create_from_mne_raw(
-        raws,
-        trial_start_offset_samples=0,
-        trial_stop_offset_samples=0,
-        window_size_samples=window_size_samples,
-        window_stride_samples=window_size_samples,
-        drop_last_window=True,
-        accepted_bads_ratio=0.0,
-        drop_bad_windows=True,
-        on_missing='ignore',
-        descriptions=descriptions,
-        mapping=mapping,
-        # preload=True
-    )
-
-    # channel-wise zscore normalization
-    preprocess(windows_dataset, [Preprocessor(zscore)])
-
-    return windows_dataset
 
 
 if __name__ == '__main__':
