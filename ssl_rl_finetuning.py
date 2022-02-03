@@ -17,20 +17,14 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 from braindecode.datasets.sleep_physionet import SleepPhysionet
-from braindecode.datasets import BaseConcatDataset
+from braindecode.datasets.base import BaseConcatDataset, BaseDataset, WindowsDataset
 from braindecode.datautil.preprocess import preprocess, Preprocessor
-from braindecode.preprocessing.windowers import create_windows_from_events
+from braindecode.preprocessing.windowers import create_windows_from_events, create_fixed_length_windows
 from braindecode.util import set_random_seeds
-from braindecode.models import SleepStagerChambon2018
-from braindecode import EEGClassifier
 from braindecode.datautil.preprocess import zscore
-from braindecode.samplers.ssl import RelativePositioningSampler
-from braindecode.datasets import (create_from_mne_raw, create_from_mne_epochs)
+from braindecode.datasets import create_from_mne_raw
 
 from sklearn.model_selection import train_test_split
-from skorch.helper import predefined_split
-from skorch.callbacks import Checkpoint, EarlyStopping, EpochScoring
-from skorch.utils import to_tensor
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import classification_report
 from sklearn.metrics import balanced_accuracy_score
@@ -40,14 +34,6 @@ from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import train_test_split
 
 from  mat73 import loadmat
-
-# visualizations
-
-from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
-from matplotlib import cm
-
-# ----
 
 # classes
 from helper_funcs import HelperFuncs as hf
@@ -64,7 +50,8 @@ from segment import Segmenter
 
 ### Load model
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='abnormal_noise_test', help='Dataset to be finetuned.')
+# @click.option('--dataset_name', '--dataset', '-n', default='tuh_abnormal', help='Dataset for downstream task.')
+@click.option('--dataset_name', '--dataset', '-n', default='space_bambi', help='Dataset for downstream task.')
 @click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
 # @click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
 @click.option('--random_state', default=87, help='Set a static random state so that the same result is generated everytime.')
@@ -76,22 +63,23 @@ from segment import Segmenter
 @click.option('--lr', default=5e-3, help='Learning rate of the pretrained model.')
 @click.option('--batch_size', default=512, help='Batch size of the pretrained model.')
 @click.option('--n_channels', default=2, help='Number of channels.')
+@click.option('--connectivity_plot', default=False, help='Plot UMAP connectivity plot.')
 @click.option('--edge_bundling_plot', default=False, help='Plot UMAP connectivity plot with edge bundling (takes a long time).')
 # @click.option('--annotations', default=['W', 'N1', 'N2', 'N3', 'R'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['T0', 'T1', 'T2'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['abnormal', 'normal'], help='Annotations for plotting.')
-# @click.option('--annotations', default=['artifact', 'non-artifact'], help='Annotations for plotting.')
+@click.option('--annotations', default=['artifact', 'non-artifact', 'ignored'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['M01', 'M05', 'M11'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['M01', 'test'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['white_noise', 'normal_noise'], help='Annotations for plotting.')
-@click.option('--annotations', default=['abnormal', 'normal', 'white_noise'], help='Annotations for plotting.')
+# @click.option('--annotations', default=['abnormal', 'normal', 'white_noise'], help='Annotations for plotting.')
 @click.option('--show_plots', '--show', default=False, help='Show plots.')
 @click.option('--load_feature_vectors', default=None, help='Load feature vectors passed through SSL model (input name of vector file).')
 @click.option('--load_latest_model', default=False, help='Load the latest pretrained model from the ssl_rl_pretraining.py script.')
 @click.option('--fully_supervised', default=False, help='Train a fully-supervised model for comparison with the downstream task.')
 
 
-def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cut_hz, high_cut_hz, sfreq, lr, batch_size, n_channels, edge_bundling_plot, annotations, show_plots, load_feature_vectors, load_latest_model, fully_supervised):
+def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cut_hz, high_cut_hz, sfreq, lr, batch_size, n_channels, connectivity_plot, edge_bundling_plot, annotations, show_plots, load_feature_vectors, load_latest_model, fully_supervised):
     print(':: STARTING MAIN ::')
 
     # print all parameter vars
@@ -128,11 +116,9 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         # windows_dataset = load_scopolamine_abnormal_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         # windows_dataset = load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         # windows_dataset = load_scopolamine_test_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
-        # windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
+        windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
         # windows_dataset = load_generated_noisy_signals(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
-        windows_dataset = load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
-
-        ### Fine tune on Sleep staging SSL model
+        # windows_dataset = load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
 
         # split by subject
         subjects = np.unique(windows_dataset.description['subject'])
@@ -149,6 +135,12 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
                 [ds for ds in windows_dataset.datasets
                     if ds.description['subject'] in values])
 
+        # init metadata_string for file naming
+        metadata_string = f'{dataset_name}_{window_size_s}s_windows_{len(subjects)}_subjects_{device}_{sfreq}hz'
+
+        # init plotting object
+        p = Plot(dataset_name, metadata_string, show=show_plots)
+
         ### trying w/o sequential layer
         # model.emb.return_feats = True
 
@@ -161,8 +153,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             split.return_pair = False  # Return single windows
             loader = DataLoader(split, batch_size=batch_size, num_workers=num_workers)
             with torch.no_grad():
-                feats = [model.emb(batch_x.to(device)).cpu().numpy()
-                            for batch_x, _, _ in loader]
+                feats = [model.emb(batch_x.to(device)).cpu().numpy() for batch_x, _, _ in loader]
             data[name] = (np.concatenate(feats), split.get_metadata()['target'].values)
 
 
@@ -177,24 +168,33 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         train_y_pred = clf_pipe.predict(data['train'][0])
         valid_y_pred = clf_pipe.predict(data['valid'][0])
         test_y_pred = clf_pipe.predict(data['test'][0])
-        # test_ds_y_pred = clf_pipe.predict(test_ds_data[0])
 
         train_bal_acc = balanced_accuracy_score(data['train'][1], train_y_pred)
         valid_bal_acc = balanced_accuracy_score(data['valid'][1], valid_y_pred)
         test_bal_acc = balanced_accuracy_score(data['test'][1], test_y_pred)
-        # test_ds_acc = balanced_accuracy_score(test_ds_data[1], test_ds_y_pred)
 
         print('Sleep staging performance with logistic regression:')
         print(f'Train bal acc: {train_bal_acc:0.4f}')
         print(f'Valid bal acc: {valid_bal_acc:0.4f}')
         print(f'Test bal acc: {test_bal_acc:0.4f}')
-        # print(f'Test bal acc: {test_ds_acc:0.4f}')
 
         print('Results on test set:')
-        print(confusion_matrix(data['test'][1], test_y_pred))
-        print(classification_report(data['test'][1], test_y_pred))
+        # confusion matrix
+        conf_matrix = confusion_matrix(data['test'][1], test_y_pred)
+        print(conf_matrix)
+        # save plot
+        p.plot_confusion_matrix(conf_matrix)
 
-        metadata_string = f'{dataset_name}_{window_size_s}s_windows_{len(subjects)}_subjects_{device}_{sfreq}hz'
+        # classification report
+        class_report = classification_report(data['test'][1], test_y_pred)
+        print(class_report)
+        # save report
+        dir = 'classification_reports/downstream/'
+        hf.check_dir(dir)
+        with open(f'{dir}{hf.get_datetime()}_class_report_{metadata_string}.txt', "w") as f:
+            f.write(pprint.pformat(class_report, indent=4, sort_dicts=False))
+
+
 
         X = np.concatenate([v[0] for k, v in data.items()])
         y = np.concatenate([v[1] for k, v in data.items()])
@@ -230,14 +230,11 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
 
 
     ### Visualizing clusters
-
-    # init plotting object
-    p = Plot(dataset_name, metadata_string, show=show_plots)
-
     p.plot_PCA(X, y, annotations)
     p.plot_TSNE(X, y, annotations)
     p.plot_UMAP(X, y, annotations)
-    # p.plot_UMAP_connectivity(X)
+    if connectivity_plot:
+        p.plot_UMAP_connectivity(X)
     if edge_bundling_plot:
         p.plot_UMAP_connectivity(X, edge_bundling=True)
     p.plot_UMAP_3d(X, y)
@@ -251,29 +248,38 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             penalty='l2', C=1.0, class_weight='balanced', solver='newton-cg',
             multi_class='multinomial', random_state=random_state)
 
-        
 
         # Fit and score the logistic regression
         clf_pipe.fit(*data['train'])
         train_y_pred = clf_pipe.predict(data['train'][0])
         valid_y_pred = clf_pipe.predict(data['valid'][0])
         test_y_pred = clf_pipe.predict(data['test'][0])
-        # test_ds_y_pred = clf_pipe.predict(test_ds_data[0])
 
         train_bal_acc = balanced_accuracy_score(data['train'][1], train_y_pred)
         valid_bal_acc = balanced_accuracy_score(data['valid'][1], valid_y_pred)
         test_bal_acc = balanced_accuracy_score(data['test'][1], test_y_pred)
-        # test_ds_acc = balanced_accuracy_score(test_ds_data[1], test_ds_y_pred)
 
         print('Sleep staging performance with logistic regression:')
         print(f'Train bal acc: {train_bal_acc:0.4f}')
         print(f'Valid bal acc: {valid_bal_acc:0.4f}')
         print(f'Test bal acc: {test_bal_acc:0.4f}')
-        # print(f'Test bal acc: {test_ds_acc:0.4f}')
 
         print('Results on test set:')
-        print(confusion_matrix(data['test'][1], test_y_pred))
-        print(classification_report(data['test'][1], test_y_pred))
+        # confusion matrix
+        conf_matrix = confusion_matrix(data['test'][1], test_y_pred)
+        print(conf_matrix)
+        # save plot
+        p.plot_confusion_matrix(conf_matrix)
+
+        # classification report
+        class_report = classification_report(data['test'][1], test_y_pred)
+        print(class_report)
+        # save report
+        dir = 'classification_reports/downstream/'
+        hf.check_dir(dir)
+        with open(f'{dir}{hf.get_datetime()}_class_report_{metadata_string}.txt', "w") as f:
+            f.write(pprint.pformat(class_report, indent=4, sort_dicts=False))
+
 
 
 
@@ -287,8 +293,8 @@ def preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs):
     print(f'--low_cut freq {low_cut_hz}')
 
     for raw in raws:
-        raw = raw.filter(l_freq=low_cut_hz, h_freq=high_cut_hz, n_jobs=n_jobs)    # filtering
         raw = raw.resample(sfreq)   # resample
+        raw = raw.filter(l_freq=low_cut_hz, h_freq=high_cut_hz, n_jobs=n_jobs)    # filtering
 
     return raws
 
@@ -448,13 +454,17 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
 
     # space_bambi directory
     # data_dir = './data/SPACE_BAMBI_2channels/'
-    data_dir = '/home/maligan/Documents/VU/Year_2/M.Sc._Thesis_[X_400285]/my_thesis/code/ssl_thesis/data/SPACE_BAMBI_2channels'
+    data_dir = '/home/maligan/Documents/VU/Year_2/M.Sc._Thesis_[X_400285]/my_thesis/code/ssl_thesis/data/SPACE_BAMBI_2channels/'
 
     raws = []
     # added = 0
 
     print(f'{len(os.listdir(data_dir))} files found')
     for i, path in enumerate(os.listdir(data_dir)):
+        # limiter
+        if i == 25:
+            break
+            
         full_path = os.path.join(data_dir, path)
         # check whether raw has longer duration than window_size
         raw = mne.io.read_raw_fif(full_path)
@@ -463,34 +473,44 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
         # if duration > window_size_samples:
         raws.append(raw)
 
-        if i > 5:
-            break
 
     # preprocess dataset
     dataset = preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs)
+    event_mapping = {0: 'artifact', 1: 'non-artifact', 2:'ignore'}
 
     # segment dataset recordings into windows and add descriptions
-    segments, descriptions = [], []
+    raws, descriptions = [], []
     segmenter = Segmenter(window_size=window_size_s, window_overlap=0.5, cutoff_length=0.1)
     for subject_id, raw in enumerate(dataset):
-        segments += [segmenter.segment(raw)]
-        descriptions += [{"subject": subject_id, "recording": raw}]
-
-
-    # base_datasets = [BaseDataset(raw, desc) for raw, desc in zip(dataset, descriptions)]
-    # windows_dataset = BaseConcatDataset(base_datasets)
-
+        x = segmenter.segment(raw)
+        annot_from_events = mne.annotations_from_events(events=x.events, event_desc=event_mapping, sfreq=x.info['sfreq'])
+        annot_from_events.duration = np.array([x.times[-1]]*len(x.events))
+        raws += [raw.set_annotations(annot_from_events)]
+        descriptions += [{"subject": int(subject_id), "recording": raw}]
     
-    from braindecode.datasets.base import WindowsDataset, BaseConcatDataset
 
-    windows_ds_list = []
-    for i, x in enumerate(descriptions):
-        windows_ds_list += [WindowsDataset(segments[i], x)]
-    windows_dataset = BaseConcatDataset(windows_ds_list)
+    # create windows from epochs and descriptions
+    ds = BaseConcatDataset([BaseDataset(raws[i], descriptions[i]) for i in range(len(descriptions))])
+    window_size_samples = window_size_s * sfreq
+    mapping = {
+        'artifact': 0,
+        'non-artifact': 1,
+        'ignore': 2
+    }
+
+    windows_dataset = create_windows_from_events(
+        ds, 
+        # trial_start_offset_samples = 0,
+        # trial_stop_offset_samples = 0,
+        # window_size_samples = window_size_samples,
+        # window_stride_samples = window_size_samples,
+        mapping = mapping,
+        # preload = True,
+    )
 
 
-    # create windows
-    # windows_dataset = create_windows_dataset(dataset, window_size_samples, descriptions)
+    # channel-wise zscore normalization
+    preprocess(windows_dataset, [Preprocessor(zscore)])
 
     return windows_dataset
 

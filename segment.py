@@ -33,11 +33,11 @@ class Segmenter:
         start = [onset[0]/raw.info['sfreq'] for onset in events]
         end = [onset + self.window_size - 1./raw.info['sfreq'] for onset in start]
         sfreq = [raw.info['sfreq']]*len(events)
-        filenames = [raw._filenames[0]]*len(events)
+        # filenames = [raw._filenames[0]]*len(events)
 
         # Create a dataframe
-        df = pd.DataFrame(list(zip(start, end, sfreq, labels, filenames)), index=event_idx,
-                        columns=['start', 'end', 'sfreq', 'true_label', 'filename'])
+        df = pd.DataFrame(list(zip(start, end, sfreq, labels)), index=event_idx,
+                        columns=['i_window_in_trial', 'i_start_in_trial', 'i_stop_in_trial', 'target'])
 
         return df
 
@@ -79,7 +79,7 @@ class Segmenter:
                 else:
                     continue
         # Assign labels to ids
-        mapped_segments.event_id = {'nonartifact': 1, 'artifact': 0, 'ignored': 2}
+        mapped_segments.event_id = {'artifact': 0, 'non-artifact': 1, 'ignored': 2}
 
         # update metadata
         mapped_segments._metadata = self._segment_metadata(raw, mapped_segments.events)
@@ -110,7 +110,6 @@ class Segmenter:
         segments = mne.Epochs(raw, events, event_id={'nonartifact': 1}, preload=True,
                             tmin=0, tmax=self.window_size - 1 / sfreq, metadata=metadata, baseline=None, verbose=0)
 
-        # 
         mapped_segments = self._map_artifacts(raw, segments)
 
         if self.descriptions is not None:
