@@ -37,7 +37,7 @@ class Plot:
 
     # Extract loss and balanced accuracy values for plotting from history object
     def plot_acc(self, clf_history):
-        print('plotting accuracy per epoch...')
+        print('plotting accuracy per epoch... ', end='')
         df = pd.DataFrame(clf_history)
 
         df['train_acc'] *= 100
@@ -70,13 +70,14 @@ class Plot:
 
         plt.tight_layout()
         self._plot(plt, 'train_loss_acc')
-        print(':: accuracy plot saved')
+        print('Done')
 
 
     def plot_confusion_matrix(self, conf_matrix):
+        print(':: plotting confusion matrix heatmap... ', end='')
         sns.heatmap(conf_matrix, annot=True, fmt='d', linewidths=2)
         self._plot(plt, 'conf_matrix')
-        print(':: confusion matrix heatmap saved')
+        print('Done')
 
 
     def plot_PCA(self, X, y, annotations=['W', 'N1', 'N2', 'N3', 'R']):
@@ -147,7 +148,7 @@ class Plot:
     # UMAP plot with connectivity
     # https://umap-learn.readthedocs.io/en/latest/plotting.html
     def plot_UMAP_connectivity(self, X, edge_bundling=False):
-        print(':: plotting UMAP with connectivity...')
+        print(':: plotting UMAP with connectivity... ', end='')
         title = 'UMAP_connectivity'
         mapping = umap.UMAP(n_components=2, init='random').fit(X)
 
@@ -158,7 +159,7 @@ class Plot:
             umap.plot.connectivity(mapping, edge_bundling='hammer') # bundles edges
             
         self._plot(plt, title)
-        print(':: UMAP w/ connectivity saved')
+        print('Done')
 
 
     # 3D UMAP plot (plotly)
@@ -178,7 +179,7 @@ class Plot:
             width=850,
             height=850
         )
-        fig_3d.update_traces(marker_size=1)
+        fig_3d.update_traces(marker_size=3)
         hf.check_dir(f'plots/{self.dataset_name}')
         fig_3d.write_html(f'plots/{self.dataset_name}/{self.date}_UMAP_3d_{self.metadata_string}.html')
         print('Done')
