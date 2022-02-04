@@ -73,10 +73,15 @@ def load_windowed_data(preprocessed_data):
     print(':: Preprocessed windowed data loaded...')
     return windows_dataset
 
-def load_sleep_staging_windowed_dataset(subjects, subject_size, n_jobs, window_size_samples, low_cut_hz, high_cut_hz, sfreq):
+def load_sleep_staging_windowed_dataset(subject_size_percent, n_jobs, window_size_samples, low_cut_hz, high_cut_hz, sfreq):
     print(f':: loading SLEEP STAGING data...')
+
+    # get subject according to % subject size specified
+    max_files = 83
+    subjects = np.round(max_files * (subject_size_percent/100))
+
     dataset = SleepPhysionet(
-        subject_ids=subjects[subject_size],
+        subject_ids=[*range(subjects)],
         recording_ids=[1],
         crop_wake_mins=30,
         load_eeg_only=True,
@@ -111,32 +116,27 @@ def load_sleep_staging_windowed_dataset(subjects, subject_size, n_jobs, window_s
     ### Preprocessing windows
     preprocess(windows_dataset, [Preprocessor(zscore)])
 
-    return windows_dataset
+    return windows_dataset, subjects
 
 
 
-def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s):
+def load_space_bambi_raws(dataset_path, subject_size_percent, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s):
     print(':: loading SPACE/BAMBI data')
 
-    # space_bambi directory
-    # data_dir = './data/SPACE_BAMBI_2channels/'
-    data_dir = '/home/maligan/Documents/VU/Year_2/M.Sc._Thesis_[X_400285]/my_thesis/code/ssl_thesis/data/SPACE_BAMBI_2channels/'
-
+    files = os.listdir(dataset_path)
+    subjects = np.round(len(files) * (subject_size_percent/100))
+    print(f':: Using {subjects} subjects ')
     raws = []
     # added = 0
 
-    print(f'{len(os.listdir(data_dir))} files found')
-    for i, path in enumerate(os.listdir(data_dir)):
+    print(f'{len(files)} files found')
+    for i, path in enumerate(files):
         # limiter
-        if i == 25:
+        if i == subjects:
             break
             
-        full_path = os.path.join(data_dir, path)
-        # check whether raw has longer duration than window_size
+        full_path = os.path.join(dataset_path, path)
         raw = mne.io.read_raw_fif(full_path)
-        # duration = raw.times.max()
-        # print(f':: duration of [{path}]: {duration} / {window_size_samples}')
-        # if duration > window_size_samples:
         raws.append(raw)
 
 
@@ -158,7 +158,6 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
 
     # create windows from epochs and descriptions
     ds = BaseConcatDataset([BaseDataset(raws[i], descriptions[i]) for i in range(len(descriptions))])
-    window_size_samples = window_size_s * sfreq
     mapping = {
         'artifact': 0,
         'non-artifact': 1,
@@ -179,7 +178,7 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
     # channel-wise zscore normalization
     preprocess(windows_dataset, [Preprocessor(zscore)])
 
-    return windows_dataset
+    return windows_dataset, subjects
 
 
 
@@ -227,14 +226,12 @@ def create_windows_dataset(raws, window_size_samples, descriptions=None, mapping
     return windows_dataset
 
 
-def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
+def load_abnormal_raws(dataset_path, subject_size_percent, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
     print(':: loading TUH abnormal data')
-
-    data_dir = '/media/maligan/My Passport/msc_thesis/ssl_thesis/data/tuh_abnormal_data/train/'
 
     # build data dictionary
     annotations = {}
-    for annotation in get_file_list(data_dir):
+    for annotation in get_file_list(dataset_path):
         subjects = {}
         for subject in get_file_list(annotation):
             recordings = {}
@@ -281,10 +278,13 @@ def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sampl
     from sklearn.utils import shuffle
     raw_paths, descriptions, classification = shuffle(raw_paths, descriptions, classification)
 
+    # get subject according to % subject size specified
+    subjects = np.round(len(raw_paths) * (subject_size_percent/100))
+
     # limiters
-    raw_paths = raw_paths[:50]
-    descriptions = descriptions[:50]
-    classification = classification[:50]
+    raw_paths = raw_paths[:subjects]
+    descriptions = descriptions[:subjects]
+    classification = classification[:subjects]
 
     # load data and set annotations
     dataset = []
@@ -309,14 +309,28 @@ def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sampl
     # create windows
     windows_dataset = create_windows_dataset(dataset, window_size_samples, descriptions, mapping)
 
-    return windows_dataset
+    return windows_dataset, subjects
 
+# fetch predefined dataset paths according to dataset name
+def fetch_dataset_path(dataset_name):
+    paths = {
+        # 'sleep_staging': '',
+        'tuh_abnormal': '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/train/',
+        'space_bambi': '/media/maligan/My Passport/msc_thesis/data/SPACE_BAMBI_2channels/',
+    }
+
+    try: 
+        path = paths[dataset_name]
+    except:
+        path = None
+
+    return path
 
 
 
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='space_bambi', help='Dataset to be pretrained.')
-@click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
+@click.option('--dataset_name', '--dataset', '-n', default='space_bambi', help='Dataset to be pretrained (sleep_staging, tuh_abnormal, space_bambi).')
+@click.option('--subject_size_percent', default=5, help='Percentage of dataset (1-100)')
 @click.option('--random_state', default=87, help='Set a static random state so that the same result is generated everytime.')
 @click.option('--n_jobs', default=1, help='Number of subprocesses to run.')
 @click.option('--window_size_s', default=5, help='Window sizes in seconds.')
@@ -336,7 +350,7 @@ def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sampl
 
 # https://physionet.org/content/sleep-edfx/1.0.0/
 # Electrode locations Fpz-Cz, Pz-Oz
-def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, high_cut_hz, low_cut_hz, sfreq, lr, batch_size, n_epochs, preprocessed_data, accepted_bads_ratio):
+def main(dataset_name, subject_size_percent, random_state, n_jobs, window_size_s, high_cut_hz, low_cut_hz, sfreq, lr, batch_size, n_epochs, preprocessed_data, accepted_bads_ratio):
     # init variables
     window_size_samples = window_size_s * sfreq
     emb_size = sfreq
@@ -345,24 +359,25 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, high_c
     device = hf.enable_cuda()
     # Set random seed to be able to reproduce results
     set_random_seeds(seed=random_state, cuda=device == 'cuda')
-    subjects = {
-            'sample': [*range(5)],
-            'some': [*range(0,40)],
-            'all': [*range(0,83)],
-        }
-    metadata_string = f'{dataset_name}_{window_size_s}s_windows_{len(subjects[subject_size])}_subjects_{device}_{n_epochs}_epochs_{sfreq}hz'
+
+    dataset_path = fetch_dataset_path(dataset_name)
 
     # print all parameter vars
-    print(tabulate(locals().items(), tablefmt='fancy_grid'))
+    setup = tabulate(locals().items(), tablefmt='fancy_grid') 
+    print(setup)
+
+    metadata_string = f'{dataset_name}_{window_size_s}s_windows_{device}_{n_epochs}_epochs_{sfreq}hz'
 
     # if no windowed_data is specified, download it and preprocess it
     if preprocessed_data is not None:
         print(':: loading PREPROCESSED windowed dataset: ', preprocessed_data)
         windows_dataset = load_windowed_data(preprocessed_data)
     else:
-        # windows_dataset = load_sleep_staging_windowed_dataset(subjects, subject_size, n_jobs, window_size_samples, low_cut_hz, high_cut_hz, sfreq)
-        windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
-        # windows_dataset = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
+        # windows_dataset, subjects = load_sleep_staging_windowed_dataset(subjects, subject_size_percent, n_jobs, window_size_samples, low_cut_hz, high_cut_hz, sfreq)
+        windows_dataset, subjects = load_space_bambi_raws(dataset_path, subject_size_percent, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
+        # windows_dataset, subjects = load_abnormal_raws(dataset_path, subject_size_percent, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
+
+        metadata_string = f'{dataset_name}_{window_size_s}s_windows_{subjects}_%_subjects_{device}_{n_epochs}_epochs_{sfreq}hz'
 
         ### save windows
         dir = '/home/maligan/Documents/VU/Year_2/M.Sc._Thesis_[X_400285]/my_thesis/code/ssl_thesis/data/preprocessed/'
@@ -372,10 +387,15 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, high_c
         f.close()
         print(':: Data loaded, preprocessed and windowed.')
 
+    # write setup to file
+    dir = 'setup/pretrained/'
+    hf.check_dir(dir)
+    with open(f'{dir}{hf.get_datetime()}_class_report_{metadata_string}.txt', "w") as f:
+        f.write(pprint.pformat(setup, indent=4, sort_dicts=False))
+
     print(':: starting training...')
 
     ### Splitting dataset into train, valid and test sets
-
     subjects = np.unique(windows_dataset.description['subject'])
     subj_train, subj_test = train_test_split(
         subjects, test_size=0.4, random_state=random_state)
