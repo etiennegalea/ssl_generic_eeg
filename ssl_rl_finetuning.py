@@ -484,7 +484,8 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
     for subject_id, raw in enumerate(dataset):
         x = segmenter.segment(raw)
         annot_from_events = mne.annotations_from_events(events=x.events, event_desc=event_mapping, sfreq=x.info['sfreq'])
-        annot_from_events.duration = np.array([x.times[-1]]*len(x.events))
+        duration_per_event = [x.times[-1]+x.times[1]]
+        annot_from_events.duration = np.array(duration_per_event * len(x.events))
         raws += [raw.set_annotations(annot_from_events)]
         descriptions += [{"subject": int(subject_id), "recording": raw}]
     
