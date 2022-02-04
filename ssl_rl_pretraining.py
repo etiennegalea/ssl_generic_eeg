@@ -19,7 +19,7 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 from braindecode.datasets.sleep_physionet import SleepPhysionet
-from braindecode.datasets import BaseConcatDataset
+from braindecode.datasets import BaseConcatDataset, BaseDataset
 from braindecode.datautil.preprocess import preprocess, Preprocessor
 from braindecode.preprocessing.windowers import create_windows_from_events
 from braindecode.util import set_random_seeds
@@ -55,6 +55,7 @@ from helper_funcs import HelperFuncs as hf
 from ContrastiveNet import *
 from RelativePositioningDataset import *
 from plot import Plot
+from segment import Segmenter
 
 
 # ----
@@ -113,52 +114,73 @@ def load_sleep_staging_windowed_dataset(subjects, subject_size, n_jobs, window_s
     return windows_dataset
 
 
-def load_space_bambi_windowed_dataset(n_jobs, window_size_samples, low_cut_hz, high_cut_hz, sfreq, accepted_bads_ratio):
-    print(f':: loading SPACE/BAMBI data')
+
+def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s):
+    print(':: loading SPACE/BAMBI data')
 
     # space_bambi directory
     # data_dir = './data/SPACE_BAMBI_2channels/'
-    data_dir = '/home/maligan/Documents/VU/Year_2/M.Sc._Thesis_[X_400285]/my_thesis/code/ssl_thesis/data/SPACE_BAMBI_2channels'
+    data_dir = '/home/maligan/Documents/VU/Year_2/M.Sc._Thesis_[X_400285]/my_thesis/code/ssl_thesis/data/SPACE_BAMBI_2channels/'
 
     raws = []
+    # added = 0
 
     print(f'{len(os.listdir(data_dir))} files found')
     for i, path in enumerate(os.listdir(data_dir)):
-        if i == 20:
+        # limiter
+        if i == 25:
             break
+            
         full_path = os.path.join(data_dir, path)
-        raws.append(mne.io.read_raw_fif(full_path, preload=True))
+        # check whether raw has longer duration than window_size
+        raw = mne.io.read_raw_fif(full_path)
+        # duration = raw.times.max()
+        # print(f':: duration of [{path}]: {duration} / {window_size_samples}')
+        # if duration > window_size_samples:
+        raws.append(raw)
 
-    # extract descriptions from annotations
-    descriptions = []
-    for subject_id, raw in enumerate(raws):
-        descriptions += [{"subject": subject_id}]
 
-    # preprocessing
-    for raw in raws:
-        mne.io.Raw.resample(raw, sfreq)   # resample
-        mne.io.Raw.filter(raw, l_freq=low_cut_hz, h_freq=high_cut_hz, n_jobs=n_jobs)    # high-pass filter
+    # preprocess dataset
+    dataset = preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs)
+    event_mapping = {0: 'artifact', 1: 'non-artifact', 2:'ignore'}
 
-    # windowing
-    windows_dataset = create_from_mne_raw(
-        raws,
-        trial_start_offset_samples=0,
-        trial_stop_offset_samples=0,
-        window_size_samples=window_size_samples,
-        window_stride_samples=window_size_samples,
-        drop_last_window=True,
-        descriptions=descriptions,
-        accepted_bads_ratio=accepted_bads_ratio,
-        drop_bad_windows=True,
-        on_missing='ignore',
-        # mapping=mapping,
-        # preload=True
+    # segment dataset recordings into windows and add descriptions
+    raws, descriptions = [], []
+    segmenter = Segmenter(window_size=window_size_s, window_overlap=0.5, cutoff_length=0.1)
+    for subject_id, raw in enumerate(dataset):
+        x = segmenter.segment(raw)
+        annot_from_events = mne.annotations_from_events(events=x.events, event_desc=event_mapping, sfreq=x.info['sfreq'])
+        duration_per_event = [x.times[-1]+x.times[1]]
+        annot_from_events.duration = np.array(duration_per_event * len(x.events))
+        raws += [raw.set_annotations(annot_from_events)]
+        descriptions += [{"subject": int(subject_id), "recording": raw}]
+    
+
+    # create windows from epochs and descriptions
+    ds = BaseConcatDataset([BaseDataset(raws[i], descriptions[i]) for i in range(len(descriptions))])
+    window_size_samples = window_size_s * sfreq
+    mapping = {
+        'artifact': 0,
+        'non-artifact': 1,
+        'ignore': 2
+    }
+
+    windows_dataset = create_windows_from_events(
+        ds, 
+        # trial_start_offset_samples = 0,
+        # trial_stop_offset_samples = 0,
+        # window_size_samples = window_size_samples,
+        # window_stride_samples = window_size_samples,
+        mapping = mapping,
+        # preload = True,
     )
+
 
     # channel-wise zscore normalization
     preprocess(windows_dataset, [Preprocessor(zscore)])
 
     return windows_dataset
+
 
 
 def get_file_list(x):
@@ -293,7 +315,7 @@ def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sampl
 
 
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='sleep_staging', help='Dataset to be pretrained.')
+@click.option('--dataset_name', '--dataset', '-n', default='space_bambi', help='Dataset to be pretrained.')
 @click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
 @click.option('--random_state', default=87, help='Set a static random state so that the same result is generated everytime.')
 @click.option('--n_jobs', default=1, help='Number of subprocesses to run.')
@@ -338,8 +360,8 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, high_c
         print(':: loading PREPROCESSED windowed dataset: ', preprocessed_data)
         windows_dataset = load_windowed_data(preprocessed_data)
     else:
-        windows_dataset = load_sleep_staging_windowed_dataset(subjects, subject_size, n_jobs, window_size_samples, low_cut_hz, high_cut_hz, sfreq)
-        # windows_dataset = load_space_bambi_windowed_dataset(n_jobs, window_size_samples, low_cut_hz, high_cut_hz, sfreq, accepted_bads_ratio)
+        # windows_dataset = load_sleep_staging_windowed_dataset(subjects, subject_size, n_jobs, window_size_samples, low_cut_hz, high_cut_hz, sfreq)
+        windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
         # windows_dataset = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
 
         ### save windows
