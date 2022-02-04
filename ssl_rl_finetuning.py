@@ -83,7 +83,8 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
     print(':: STARTING MAIN ::')
 
     # print all parameter vars
-    print(tabulate(locals().items(), tablefmt='fancy_grid'))
+    setup = tabulate(locals().items(), tablefmt='fancy_grid')
+    print(setup)
     
     # print local parameters
     # set device to 'cuda' or 'cpu'
@@ -137,6 +138,13 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
 
         # init metadata_string for file naming
         metadata_string = f'{dataset_name}_{window_size_s}s_windows_{len(subjects)}_subjects_{device}_{sfreq}hz'
+
+        # write setup to file
+        dir = 'setup/downstream/'
+        hf.check_dir(dir)
+        with open(f'{dir}{hf.get_datetime()}_setup_{metadata_string}.txt', "w") as f:
+            f.write(pprint.pformat(setup, indent=4, sort_dicts=False))
+
 
         # init plotting object
         p = Plot(dataset_name, metadata_string, show=show_plots)

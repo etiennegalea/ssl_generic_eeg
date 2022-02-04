@@ -377,7 +377,7 @@ def main(dataset_name, subject_size_percent, random_state, n_jobs, window_size_s
         windows_dataset, subjects = load_space_bambi_raws(dataset_path, subject_size_percent, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
         # windows_dataset, subjects = load_abnormal_raws(dataset_path, subject_size_percent, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
 
-        metadata_string = f'{dataset_name}_{window_size_s}s_windows_{subjects}_%_subjects_{device}_{n_epochs}_epochs_{sfreq}hz'
+        metadata_string = f'{dataset_name}_{window_size_s}s_windows_{subjects}%_subjects_{device}_{n_epochs}_epochs_{sfreq}hz'
 
         ### save windows
         dir = '/home/maligan/Documents/VU/Year_2/M.Sc._Thesis_[X_400285]/my_thesis/code/ssl_thesis/data/preprocessed/'
@@ -390,7 +390,7 @@ def main(dataset_name, subject_size_percent, random_state, n_jobs, window_size_s
     # write setup to file
     dir = 'setup/pretrained/'
     hf.check_dir(dir)
-    with open(f'{dir}{hf.get_datetime()}_class_report_{metadata_string}.txt', "w") as f:
+    with open(f'{dir}{hf.get_datetime()}_setup_{metadata_string}.txt', "w") as f:
         f.write(pprint.pformat(setup, indent=4, sort_dicts=False))
 
     print(':: starting training...')
