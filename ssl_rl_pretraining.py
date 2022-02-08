@@ -78,7 +78,7 @@ def load_sleep_staging_windowed_dataset(subject_size_percent, n_jobs, window_siz
 
     # get subject according to % subject size specified
     max_files = 83
-    subjects = np.round(max_files * (subject_size_percent/100))
+    subjects = int(np.round(max_files * (subject_size_percent/100)))
 
     dataset = SleepPhysionet(
         subject_ids=[*range(subjects)],
@@ -124,7 +124,7 @@ def load_space_bambi_raws(dataset_path, subject_size_percent, sfreq, low_cut_hz,
     print(':: loading SPACE/BAMBI data')
 
     files = os.listdir(dataset_path)
-    subjects = np.round(len(files) * (subject_size_percent/100))
+    subjects = int(np.round(len(files) * (subject_size_percent/100)))
     print(f':: Using {subjects} subjects ')
     raws = []
     # added = 0
@@ -279,7 +279,7 @@ def load_abnormal_raws(dataset_path, subject_size_percent, sfreq, low_cut_hz, hi
     raw_paths, descriptions, classification = shuffle(raw_paths, descriptions, classification)
 
     # get subject according to % subject size specified
-    subjects = np.round(len(raw_paths) * (subject_size_percent/100))
+    subjects = int(np.round(len(raw_paths) * (subject_size_percent/100)))
 
     # limiters
     raw_paths = raw_paths[:subjects]
@@ -329,7 +329,7 @@ def fetch_dataset_path(dataset_name):
 
 
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='space_bambi', help='Dataset to be pretrained (sleep_staging, tuh_abnormal, space_bambi).')
+@click.option('--dataset_name', '--dataset', '-n', default='sleep_staging', help='Dataset to be pretrained (sleep_staging, tuh_abnormal, space_bambi).')
 @click.option('--subject_size_percent', default=5, help='Percentage of dataset (1-100)')
 @click.option('--random_state', default=87, help='Set a static random state so that the same result is generated everytime.')
 @click.option('--n_jobs', default=1, help='Number of subprocesses to run.')
@@ -373,8 +373,8 @@ def main(dataset_name, subject_size_percent, random_state, n_jobs, window_size_s
         print(':: loading PREPROCESSED windowed dataset: ', preprocessed_data)
         windows_dataset = load_windowed_data(preprocessed_data)
     else:
-        # windows_dataset, subjects = load_sleep_staging_windowed_dataset(subjects, subject_size_percent, n_jobs, window_size_samples, low_cut_hz, high_cut_hz, sfreq)
-        windows_dataset, subjects = load_space_bambi_raws(dataset_path, subject_size_percent, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
+        windows_dataset, subjects = load_sleep_staging_windowed_dataset(subject_size_percent, n_jobs, window_size_samples, low_cut_hz, high_cut_hz, sfreq)
+        # windows_dataset, subjects = load_space_bambi_raws(dataset_path, subject_size_percent, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
         # windows_dataset, subjects = load_abnormal_raws(dataset_path, subject_size_percent, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
 
         metadata_string = f'{dataset_name}_{window_size_s}s_windows_{subjects}%_subjects_{device}_{n_epochs}_epochs_{sfreq}hz'
