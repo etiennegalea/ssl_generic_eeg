@@ -50,8 +50,8 @@ from segment import Segmenter
 
 ### Load model
 @click.command()
-# @click.option('--dataset_name', '--dataset', '-n', default='tuh_abnormal', help='Dataset for downstream task.')
-@click.option('--dataset_name', '--dataset', '-n', default='space_bambi', help='Dataset for downstream task.')
+@click.option('--dataset_name', '--dataset', '-n', default='abnormal_noise', help='Dataset for downstream task.')
+# @click.option('--dataset_name', '--dataset', '-n', default='test_sleep_staging', help='Dataset for downstream task.')
 @click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
 # @click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
 @click.option('--random_state', default=87, help='Set a static random state so that the same result is generated everytime.')
@@ -68,15 +68,14 @@ from segment import Segmenter
 # @click.option('--annotations', default=['W', 'N1', 'N2', 'N3', 'R'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['T0', 'T1', 'T2'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['abnormal', 'normal'], help='Annotations for plotting.')
-@click.option('--annotations', default=['artifact', 'non-artifact', 'ignored'], help='Annotations for plotting.')
+# @click.option('--annotations', default=['artifact', 'non-artifact', 'ignored'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['M01', 'M05', 'M11'], help='Annotations for plotting.')
-# @click.option('--annotations', default=['M01', 'test'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['white_noise', 'normal_noise'], help='Annotations for plotting.')
-# @click.option('--annotations', default=['abnormal', 'normal', 'white_noise'], help='Annotations for plotting.')
+@click.option('--annotations', default=['abnormal', 'normal', 'white_noise'], help='Annotations for plotting.')
 @click.option('--show_plots', '--show', default=False, help='Show plots.')
 @click.option('--load_feature_vectors', default=None, help='Load feature vectors passed through SSL model (input name of vector file).')
 @click.option('--load_latest_model', default=False, help='Load the latest pretrained model from the ssl_rl_pretraining.py script.')
-@click.option('--fully_supervised', default=False, help='Train a fully-supervised model for comparison with the downstream task.')
+@click.option('--fully_supervised', default=True, help='Train a fully-supervised model for comparison with the downstream task.')
 
 
 def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cut_hz, high_cut_hz, sfreq, lr, batch_size, n_channels, connectivity_plot, edge_bundling_plot, annotations, show_plots, load_feature_vectors, load_latest_model, fully_supervised):
@@ -116,10 +115,9 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         # windows_dataset = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         # windows_dataset = load_scopolamine_abnormal_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         # windows_dataset = load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
-        # windows_dataset = load_scopolamine_test_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
-        windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
+        # windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
         # windows_dataset = load_generated_noisy_signals(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
-        # windows_dataset = load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
+        windows_dataset = load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
 
         # split by subject
         subjects = np.unique(windows_dataset.description['subject'])
@@ -149,20 +147,24 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         # init plotting object
         p = Plot(dataset_name, metadata_string, show=show_plots)
 
-        ### trying w/o sequential layer
-        # model.emb.return_feats = True
+        ### with (false) or without (true) sequential layer
+        model.emb.return_feats = True
 
         batch_size = 512
         num_workers = n_jobs
 
         # Extract features with the trained embedder
-        data = dict()
+        data, raw_data = dict(), dict()
         for name, split in splitted.items():
             split.return_pair = False  # Return single windows
             loader = DataLoader(split, batch_size=batch_size, num_workers=num_workers)
             with torch.no_grad():
                 feats = [model.emb(batch_x.to(device)).cpu().numpy() for batch_x, _, _ in loader]
+                # make a copy of the vectors WITHOUT passing them through the pretrained model
+                raw_vectors = [batch_x.to(device).cpu().numpy() for batch_x, _, _ in loader]
             data[name] = (np.concatenate(feats), split.get_metadata()['target'].values)
+            # concatenate channels and duplicate labels
+            raw_data[name] = (np.concatenate(np.concatenate(raw_vectors)), np.tile(splitted[name].get_metadata()['target'].values, 2))
 
 
         # Initialize the logistic regression model
@@ -181,7 +183,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         valid_bal_acc = balanced_accuracy_score(data['valid'][1], valid_y_pred)
         test_bal_acc = balanced_accuracy_score(data['test'][1], test_y_pred)
 
-        print('Sleep staging performance with logistic regression:')
+        print(f'{dataset_name} performance with logistic regression:')
         print(f'Train bal acc: {train_bal_acc:0.4f}')
         print(f'Valid bal acc: {valid_bal_acc:0.4f}')
         print(f'Test bal acc: {test_bal_acc:0.4f}')
@@ -202,8 +204,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         with open(f'{dir}{hf.get_datetime()}_class_report_{metadata_string}.txt', "w") as f:
             f.write(pprint.pformat(class_report, indent=4, sort_dicts=False))
 
-
-
+        # get vectors (X) and labels (y)
         X = np.concatenate([v[0] for k, v in data.items()])
         y = np.concatenate([v[1] for k, v in data.items()])
 
@@ -238,52 +239,53 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
 
 
     ### Visualizing clusters
-    p.plot_PCA(X, y, annotations)
-    p.plot_TSNE(X, y, annotations)
-    p.plot_UMAP(X, y, annotations)
-    if connectivity_plot:
-        p.plot_UMAP_connectivity(X)
-    if edge_bundling_plot:
-        p.plot_UMAP_connectivity(X, edge_bundling=True)
-    p.plot_UMAP_3d(X, y)
+    # p.plot_PCA(X, y, annotations)
+    # p.plot_TSNE(X, y, annotations)
+    # p.plot_UMAP(X, y, annotations)
+    # if connectivity_plot:
+    #     p.plot_UMAP_connectivity(X)
+    # if edge_bundling_plot:
+    #     p.plot_UMAP_connectivity(X, edge_bundling=True)
+    # p.plot_UMAP_3d(X, y)
 
 
 
     ### Train a fully-supervised logistic regresion for comparison and evaluation
     if fully_supervised:
+        print(f':: Performing Fully-Supervised Logistic Regression for {dataset_name}')
         # re-init logistic regression
         log_reg = LogisticRegression(
             penalty='l2', C=1.0, class_weight='balanced', solver='newton-cg',
             multi_class='multinomial', random_state=random_state)
+        fs_pipe = make_pipeline(StandardScaler(), log_reg)
 
+        # Fit and score the logistic regression on raw vectors
+        clf_pipe.fit(*raw_data['train'])
+        train_y_pred = clf_pipe.predict(raw_data['train'][0])
+        valid_y_pred = clf_pipe.predict(raw_data['valid'][0])
+        test_y_pred = clf_pipe.predict(raw_data['test'][0])
 
-        # Fit and score the logistic regression
-        clf_pipe.fit(*data['train'])
-        train_y_pred = clf_pipe.predict(data['train'][0])
-        valid_y_pred = clf_pipe.predict(data['valid'][0])
-        test_y_pred = clf_pipe.predict(data['test'][0])
+        train_bal_acc = balanced_accuracy_score(raw_data['train'][1], train_y_pred)
+        valid_bal_acc = balanced_accuracy_score(raw_data['valid'][1], valid_y_pred)
+        test_bal_acc = balanced_accuracy_score(raw_data['test'][1], test_y_pred)
 
-        train_bal_acc = balanced_accuracy_score(data['train'][1], train_y_pred)
-        valid_bal_acc = balanced_accuracy_score(data['valid'][1], valid_y_pred)
-        test_bal_acc = balanced_accuracy_score(data['test'][1], test_y_pred)
-
-        print('Sleep staging performance with logistic regression:')
+        print(f'{dataset_name} with logistic regression:')
         print(f'Train bal acc: {train_bal_acc:0.4f}')
         print(f'Valid bal acc: {valid_bal_acc:0.4f}')
         print(f'Test bal acc: {test_bal_acc:0.4f}')
 
         print('Results on test set:')
         # confusion matrix
-        conf_matrix = confusion_matrix(data['test'][1], test_y_pred)
+        conf_matrix = confusion_matrix(raw_data['test'][1], test_y_pred)
         print(conf_matrix)
         # save plot
-        p.plot_confusion_matrix(conf_matrix)
+        p.plot_confusion_matrix(conf_matrix, 'FS')
 
         # classification report
-        class_report = classification_report(data['test'][1], test_y_pred)
+        class_report = classification_report(raw_data['test'][1], test_y_pred)
         print(class_report)
         # save report
-        dir = 'classification_reports/downstream/'
+        dir = 'classification_reports/downstream/FS/'
         hf.check_dir(dir)
         with open(f'{dir}{hf.get_datetime()}_class_report_{metadata_string}.txt', "w") as f:
             f.write(pprint.pformat(class_report, indent=4, sort_dicts=False))
@@ -462,7 +464,7 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
 
     # space_bambi directory
     # data_dir = './data/SPACE_BAMBI_2channels/'
-    data_dir = '/home/maligan/Documents/VU/Year_2/M.Sc._Thesis_[X_400285]/my_thesis/code/ssl_thesis/data/SPACE_BAMBI_2channels/'
+    data_dir = '/media/maligan/My Passport/msc_thesis/data/SPACE_BAMBI_2channels/'
 
     raws = []
     # added = 0
@@ -470,15 +472,11 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
     print(f'{len(os.listdir(data_dir))} files found')
     for i, path in enumerate(os.listdir(data_dir)):
         # limiter
-        if i == 25:
+        if i == 100:
             break
             
         full_path = os.path.join(data_dir, path)
-        # check whether raw has longer duration than window_size
         raw = mne.io.read_raw_fif(full_path)
-        # duration = raw.times.max()
-        # print(f':: duration of [{path}]: {duration} / {window_size_samples}')
-        # if duration > window_size_samples:
         raws.append(raw)
 
 
@@ -559,9 +557,9 @@ def load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sa
     print(':: loading SCOPOLAMINE data')
 
     # 11 measurements times from 0.5 hrs to 8.5 hrs after Scopolamine (or placebo) administration
-    m01 = '/media/maligan/My Passport/msc_thesis/ssl_thesis/data/scopolamine/M01/'
-    m05 = '/media/maligan/My Passport/msc_thesis/ssl_thesis/data/scopolamine/M05/'
-    m11 = '/media/maligan/My Passport/msc_thesis/ssl_thesis/data/scopolamine/M11/'
+    m01 = '/media/maligan/My Passport/msc_thesis/data/scopolamine/M01/'
+    m05 = '/media/maligan/My Passport/msc_thesis/data/scopolamine/M05/'
+    m11 = '/media/maligan/My Passport/msc_thesis/data/scopolamine/M11/'
 
     dataset, descriptions = [], []
     info = mne.create_info(ch_names=['Fpz-cz', 'Pz-Oz'], ch_types=['eeg']*2, sfreq=1012)
@@ -596,8 +594,8 @@ def load_scopolamine_test_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_si
     print(':: loading SCOPOLAMINE data')
 
     # 11 measurements times from 0.5 hrs to 8.5 hrs after Scopolamine (or placebo) administration
-    m01 = '/media/maligan/My Passport/msc_thesis/ssl_thesis/data/scopolamine/M01/'
-    m11 = '/media/maligan/My Passport/msc_thesis/ssl_thesis/data/scopolamine/M11/'
+    m01 = '/media/maligan/My Passport/msc_thesis/data/scopolamine/M01/'
+    m11 = '/media/maligan/My Passport/msc_thesis/data/scopolamine/M11/'
 
     dataset, descriptions = [], []
     info = mne.create_info(ch_names=['Fpz-cz', 'Pz-Oz'], ch_types=['eeg']*2, sfreq=1012)
@@ -701,7 +699,7 @@ def load_scopolamine_abnormal_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, windo
 def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
     print(':: loading TUH abnormal data')
 
-    data_dir = '/media/maligan/My Passport/msc_thesis/ssl_thesis/data/tuh_abnormal_data/eval/'
+    data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
 
     # build data dictionary
     annotations = {}
@@ -810,7 +808,7 @@ def load_generated_noisy_signals(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_
 def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
     print(':: loading TUH abnormal data + white noise')
 
-    data_dir = '/media/maligan/My Passport/msc_thesis/ssl_thesis/data/tuh_abnormal_data/eval/'
+    data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
 
     # build data dictionary
     annotations = {}
