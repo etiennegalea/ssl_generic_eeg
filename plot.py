@@ -25,11 +25,11 @@ class Plot:
         self.metadata_string = metadata_string
         self.date = hf.get_datetime(dateonly=False)
 
-    def _plot(self, figure, title):
+    def _plot(self, figure, title, _title=''):
         hf.check_dir(f'plots/{self.dataset_name}')
         # save fig
         if self.save:
-            figure.savefig(f'plots/{self.dataset_name}/{self.date}_{title}_{self.metadata_string}.png')
+            figure.savefig(f'plots/{self.dataset_name}/{self.date}_{title+_title}_{self.metadata_string}.png')
         # show fig
         if self.show:
             figure.show()
@@ -73,10 +73,10 @@ class Plot:
         print('Done')
 
 
-    def plot_confusion_matrix(self, conf_matrix):
+    def plot_confusion_matrix(self, conf_matrix, _title=''):
         print(':: plotting confusion matrix heatmap... ', end='')
         sns.heatmap(conf_matrix, annot=True, fmt='d', linewidths=2)
-        self._plot(plt, 'conf_matrix')
+        self._plot(plt, 'conf_matrix', _title)
         print('Done')
 
 
