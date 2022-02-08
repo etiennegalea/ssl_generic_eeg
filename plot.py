@@ -7,7 +7,6 @@ import seaborn as sns
 
 import umap.plot
 import umap.umap_ as UMAP
-from umap import UMAP
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 import plotly.express as px

@@ -40,7 +40,7 @@ class HelperFuncs():
     # get date, time, or both
     def get_datetime(dateonly=False):
         dt = datetime.now()
-        return dt.strftime("%Y_%m_%d") if dateonly else dt.strftime("%Y_%m_%d__%H_%M_%S")
+        return dt.strftime("%Y_%m_%d") if dateonly else dt.strftime("%Y_%m_%d__%H_%M")
 
     # attempting to enable GPU processing
     def enable_cuda():
