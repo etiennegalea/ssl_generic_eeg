@@ -63,9 +63,10 @@ venv/
 *.json
 
 
-# data, models, plots and vectors
+# setups, data, models, plots, vectors, logs
+setup/
+data/
 models/
 plots/
 feature_vectors/
-data/
-
+classification_reports/
