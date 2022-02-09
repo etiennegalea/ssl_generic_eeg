@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 # %matplotlib inline
@@ -7,6 +8,7 @@ import seaborn as sns
 
 import umap.plot
 import umap.umap_ as UMAP
+from umap import UMAP
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 import plotly.express as px
@@ -36,7 +38,7 @@ class Plot:
 
     # Extract loss and balanced accuracy values for plotting from history object
     def plot_acc(self, clf_history):
-        print('plotting accuracy per epoch... ', end='')
+        print(':: plotting accuracy per epoch... ', end='')
         df = pd.DataFrame(clf_history)
 
         df['train_acc'] *= 100
@@ -181,4 +183,62 @@ class Plot:
         fig_3d.update_traces(marker_size=3)
         hf.check_dir(f'plots/{self.dataset_name}')
         fig_3d.write_html(f'plots/{self.dataset_name}/{self.date}_UMAP_3d_{self.metadata_string}.html')
+        print('Done')
+
+    # Plot learning curves for fully-supervised and self-supervised logistic regression
+    def plot_learning_curves(self, train_sizes, ssl_train_scores, ssl_test_scores, raw_train_scores, raw_test_scores, dataset_name):
+        # create additional features
+        ssl_train_scores_mean, ssl_test_scores_mean = np.mean(ssl_train_scores, axis=1), np.mean(ssl_test_scores, axis=1)
+        ssl_train_scores_std, ssl_test_scores_std = np.std(ssl_train_scores, axis=1), np.std(ssl_test_scores, axis=1)
+        raw_train_scores_mean, raw_test_scores_mean = np.mean(raw_train_scores, axis=1), np.mean(raw_test_scores, axis=1)
+        raw_train_scores_std, raw_test_scores_std = np.std(raw_train_scores, axis=1), np.std(raw_test_scores, axis=1)
+        
+
+        print(':: plotting learning curves... ', end='')
+        _, ax = plt.subplots(1, 1, figsize=(20, 10))
+        ax.grid()
+
+        # fill in std deviation for SSL
+        ax.fill_between(
+            train_sizes,
+            ssl_train_scores_mean - ssl_train_scores_std,
+            ssl_train_scores_mean + ssl_train_scores_std,
+            alpha=0.1,
+            color="r",
+        )
+        ax.fill_between(
+            train_sizes,
+            ssl_test_scores_mean - ssl_test_scores_std,
+            ssl_test_scores_mean + ssl_test_scores_std,
+            alpha=0.1,
+            color="r",
+        )
+
+        # fill in std deviation for FS
+        ax.fill_between(
+            train_sizes,
+            raw_train_scores_mean - raw_train_scores_std,
+            raw_train_scores_mean + raw_train_scores_std,
+            alpha=0.1,
+            color="g",
+        )
+        ax.fill_between(
+            train_sizes,
+            raw_test_scores_mean - raw_test_scores_std,
+            raw_test_scores_mean + raw_test_scores_std,
+            alpha=0.1,
+            color="g",
+        )
+
+        ax.set_xlabel("Training examples")
+        ax.set_ylabel("Score")
+
+        ax.set_title(f'Fully-Supervised and Self-Supervised Logistic Regression scores per Training Example for {dataset_name} dataset')
+        plt.plot(train_sizes, ssl_train_scores_mean, color='r', label='SSL Training Score')
+        plt.plot(train_sizes, ssl_test_scores_mean, '--', color='r', label='SSL Cross-Validation')
+        plt.plot(train_sizes, raw_train_scores_mean, color='g', label='FS Training Score')
+        plt.plot(train_sizes, raw_test_scores_mean, '--', color='g', label='FS Cross-Validation')
+        plt.legend(loc="best")
+
+        self._plot(plt, 'logit_learning_curves')
         print('Done')

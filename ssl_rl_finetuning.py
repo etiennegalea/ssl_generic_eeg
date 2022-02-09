@@ -32,8 +32,10 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import train_test_split
+from sklearn.model_selection import learning_curve
 
 from  mat73 import loadmat
+import matplotlib.pyplot as plt
 
 # classes
 from helper_funcs import HelperFuncs as hf
@@ -50,7 +52,7 @@ from segment import Segmenter
 
 ### Load model
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='abnormal_noise', help='Dataset for downstream task.')
+@click.option('--dataset_name', '--dataset', '-n', default='sleep_staging', help='Dataset for downstream task.')
 # @click.option('--dataset_name', '--dataset', '-n', default='test_sleep_staging', help='Dataset for downstream task.')
 @click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
 # @click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
@@ -61,17 +63,17 @@ from segment import Segmenter
 @click.option('--low_cut_hz', '--lfreq', '-l', default=0.5, help='Low-pass filter frequency.')
 @click.option('--sfreq', default=100, help='Sampling frequency of the input data.')
 @click.option('--lr', default=5e-3, help='Learning rate of the pretrained model.')
-@click.option('--batch_size', default=512, help='Batch size of the pretrained model.')
+@click.option('--batch_size', default=256, help='Batch size of the pretrained model.')
 @click.option('--n_channels', default=2, help='Number of channels.')
 @click.option('--connectivity_plot', default=False, help='Plot UMAP connectivity plot.')
 @click.option('--edge_bundling_plot', default=False, help='Plot UMAP connectivity plot with edge bundling (takes a long time).')
-# @click.option('--annotations', default=['W', 'N1', 'N2', 'N3', 'R'], help='Annotations for plotting.')
+@click.option('--annotations', default=['W', 'N1', 'N2', 'N3', 'R'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['T0', 'T1', 'T2'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['abnormal', 'normal'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['artifact', 'non-artifact', 'ignored'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['M01', 'M05', 'M11'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['white_noise', 'normal_noise'], help='Annotations for plotting.')
-@click.option('--annotations', default=['abnormal', 'normal', 'white_noise'], help='Annotations for plotting.')
+# @click.option('--annotations', default=['abnormal', 'normal', 'white_noise'], help='Annotations for plotting.')
 @click.option('--show_plots', '--show', default=False, help='Show plots.')
 @click.option('--load_feature_vectors', default=None, help='Load feature vectors passed through SSL model (input name of vector file).')
 @click.option('--load_latest_model', default=False, help='Load the latest pretrained model from the ssl_rl_pretraining.py script.')
@@ -80,6 +82,9 @@ from segment import Segmenter
 
 def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cut_hz, high_cut_hz, sfreq, lr, batch_size, n_channels, connectivity_plot, edge_bundling_plot, annotations, show_plots, load_feature_vectors, load_latest_model, fully_supervised):
     print(':: STARTING MAIN ::')
+
+    train_sizes = [1,10,100,500,1000,1500,2000,3000]
+    
 
     # print all parameter vars
     setup = tabulate(locals().items(), tablefmt='fancy_grid')
@@ -103,13 +108,14 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         print(f":: loading the latest pretrained model: {latest}")
         model = torch.load(f"{model_dir}{latest}.model")
     else:
-        model = torch.load("models/pretrained/2021_12_16__10_23_49_sleep_staging_5s_windows_83_subjects_cpu_15_epochs_100hz.model")
+        # model = torch.load("models/pretrained/2021_12_16__10_23_49_sleep_staging_5s_windows_83_subjects_cpu_15_epochs_100hz.model")
+        model = torch.load("models/pretrained/2022_01_31__12_02_47_sleep_staging_5s_windows_5_subjects_cpu_15_epochs_100hz.model")
 
     print(model)
 
     # DOWNSTREAM TASK - FINE TUNING)
     if load_feature_vectors is None:
-        # windows_dataset = load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq)
+        windows_dataset = load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq)
         # data, descriptions = load_sleep_staging_raws()
         # windows_dataset = load_bci_data(subject_size, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         # windows_dataset = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
@@ -117,7 +123,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         # windows_dataset = load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         # windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
         # windows_dataset = load_generated_noisy_signals(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
-        windows_dataset = load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
+        # windows_dataset = load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
 
         # split by subject
         subjects = np.unique(windows_dataset.description['subject'])
@@ -150,7 +156,6 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         ### with (false) or without (true) sequential layer
         model.emb.return_feats = True
 
-        batch_size = 512
         num_workers = n_jobs
 
         # Extract features with the trained embedder
@@ -164,14 +169,34 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
                 raw_vectors = [batch_x.to(device).cpu().numpy() for batch_x, _, _ in loader]
             data[name] = (np.concatenate(feats), split.get_metadata()['target'].values)
             # concatenate channels and duplicate labels
-            raw_data[name] = (np.concatenate(np.concatenate(raw_vectors)), np.tile(splitted[name].get_metadata()['target'].values, 2))
+            raw_data[name] = (np.concatenate(np.concatenate(raw_vectors)), np.tile(splitted[name].get_metadata()['target'].values, n_channels))
 
+
+        # combine all vectors (X) and labels (y) from DATA sets
+        X = np.concatenate([v[0] for k, v in data.items()])
+        y = np.concatenate([v[1] for k, v in data.items()])
+
+        # combine all vectors (X) and labels (y) from RAW_DATA sets
+        X_raw = np.concatenate([v[0] for k, v in raw_data.items()])
+        y_raw = np.concatenate([v[1] for k, v in raw_data.items()])
 
         # Initialize the logistic regression model
         log_reg = LogisticRegression(
             penalty='l2', C=1.0, class_weight='balanced', solver='newton-cg',
             multi_class='multinomial', random_state=random_state)
         clf_pipe = make_pipeline(StandardScaler(), log_reg)
+
+        # estimate learning curve specifications
+        ssl_train_sizes, ssl_train_scores, ssl_test_scores = learning_curve(
+            clf_pipe,
+            X=X,
+            y=y,
+            cv=5,
+            scoring='accuracy',
+            n_jobs=-1,
+            train_sizes = train_sizes,
+            shuffle=True
+        )
 
         # Fit and score the logistic regression
         clf_pipe.fit(*data['train'])
@@ -203,10 +228,6 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         hf.check_dir(dir)
         with open(f'{dir}{hf.get_datetime()}_class_report_{metadata_string}.txt', "w") as f:
             f.write(pprint.pformat(class_report, indent=4, sort_dicts=False))
-
-        # get vectors (X) and labels (y)
-        X = np.concatenate([v[0] for k, v in data.items()])
-        y = np.concatenate([v[1] for k, v in data.items()])
 
         ### save fine-tuned model
         dir = 'models/finetuned/'
@@ -249,7 +270,6 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
     # p.plot_UMAP_3d(X, y)
 
 
-
     ### Train a fully-supervised logistic regresion for comparison and evaluation
     if fully_supervised:
         print(f':: Performing Fully-Supervised Logistic Regression for {dataset_name}')
@@ -259,11 +279,24 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             multi_class='multinomial', random_state=random_state)
         fs_pipe = make_pipeline(StandardScaler(), log_reg)
 
+        raw_train_sizes, raw_train_scores, raw_test_scores = learning_curve(
+            fs_pipe,
+            X=X_raw,
+            y=y_raw,
+            cv=5,
+            scoring='accuracy',
+            n_jobs=-1,
+            train_sizes = train_sizes,
+            shuffle=True
+        )
+
+        assert ssl_train_sizes == raw_train_sizes, 'train sizes for SSL and FS logit should be identical!'
+
         # Fit and score the logistic regression on raw vectors
-        clf_pipe.fit(*raw_data['train'])
-        train_y_pred = clf_pipe.predict(raw_data['train'][0])
-        valid_y_pred = clf_pipe.predict(raw_data['valid'][0])
-        test_y_pred = clf_pipe.predict(raw_data['test'][0])
+        fs_pipe.fit(*raw_data['train'])
+        train_y_pred = fs_pipe.predict(raw_data['train'][0])
+        valid_y_pred = fs_pipe.predict(raw_data['valid'][0])
+        test_y_pred = fs_pipe.predict(raw_data['test'][0])
 
         train_bal_acc = balanced_accuracy_score(raw_data['train'][1], train_y_pred)
         valid_bal_acc = balanced_accuracy_score(raw_data['valid'][1], valid_y_pred)
@@ -290,6 +323,18 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         with open(f'{dir}{hf.get_datetime()}_class_report_{metadata_string}.txt', "w") as f:
             f.write(pprint.pformat(class_report, indent=4, sort_dicts=False))
 
+        # plotting learning curves
+        p.plot_learning_curves(
+            train_sizes,
+            ssl_train_scores=ssl_train_scores, 
+            ssl_test_scores=ssl_test_scores, 
+            raw_train_scores=raw_train_scores, 
+            raw_test_scores=raw_test_scores, 
+            dataset_name=dataset_name
+        )
+
+    plt.legend(loc="best")
+    plt.show()
 
 
 
@@ -472,7 +517,7 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
     print(f'{len(os.listdir(data_dir))} files found')
     for i, path in enumerate(os.listdir(data_dir)):
         # limiter
-        if i == 100:
+        if i == 40:
             break
             
         full_path = os.path.join(data_dir, path)
