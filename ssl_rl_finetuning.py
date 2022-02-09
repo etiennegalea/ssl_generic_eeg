@@ -52,7 +52,7 @@ from segment import Segmenter
 
 ### Load model
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='sleep_staging', help='Dataset for downstream task.')
+@click.option('--dataset_name', '--dataset', '-n', default='space_bambi', help='Dataset for downstream task.')
 # @click.option('--dataset_name', '--dataset', '-n', default='test_sleep_staging', help='Dataset for downstream task.')
 @click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
 # @click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
@@ -67,10 +67,10 @@ from segment import Segmenter
 @click.option('--n_channels', default=2, help='Number of channels.')
 @click.option('--connectivity_plot', default=False, help='Plot UMAP connectivity plot.')
 @click.option('--edge_bundling_plot', default=False, help='Plot UMAP connectivity plot with edge bundling (takes a long time).')
-@click.option('--annotations', default=['W', 'N1', 'N2', 'N3', 'R'], help='Annotations for plotting.')
+# @click.option('--annotations', default=['W', 'N1', 'N2', 'N3', 'R'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['T0', 'T1', 'T2'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['abnormal', 'normal'], help='Annotations for plotting.')
-# @click.option('--annotations', default=['artifact', 'non-artifact', 'ignored'], help='Annotations for plotting.')
+@click.option('--annotations', default=['artifact', 'non-artifact', 'ignored'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['M01', 'M05', 'M11'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['white_noise', 'normal_noise'], help='Annotations for plotting.')
 # @click.option('--annotations', default=['abnormal', 'normal', 'white_noise'], help='Annotations for plotting.')
@@ -112,13 +112,13 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
 
     # DOWNSTREAM TASK - FINE TUNING)
     if load_feature_vectors is None:
-        windows_dataset = load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq)
+        # windows_dataset = load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq)
         # data, descriptions = load_sleep_staging_raws()
         # windows_dataset = load_bci_data(subject_size, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         # windows_dataset = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         # windows_dataset = load_scopolamine_abnormal_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         # windows_dataset = load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
-        # windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
+        windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
         # windows_dataset = load_generated_noisy_signals(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         # windows_dataset = load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
 
@@ -286,8 +286,6 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             train_sizes = np.logspace(0, 1, 20)/10,
             shuffle=True
         )
-
-        np.testing.assert_array_equal(ssl_train_sizes, raw_train_sizes)
 
         # Fit and score the logistic regression on raw vectors
         fs_pipe.fit(*raw_data['train'])
