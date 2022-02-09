@@ -82,10 +82,7 @@ from segment import Segmenter
 
 def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cut_hz, high_cut_hz, sfreq, lr, batch_size, n_channels, connectivity_plot, edge_bundling_plot, annotations, show_plots, load_feature_vectors, load_latest_model, fully_supervised):
     print(':: STARTING MAIN ::')
-
-    train_sizes = [1,10,100,500,1000,1500,2000,3000]
     
-
     # print all parameter vars
     setup = tabulate(locals().items(), tablefmt='fancy_grid')
     print(setup)
@@ -183,7 +180,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         # Initialize the logistic regression model
         log_reg = LogisticRegression(
             penalty='l2', C=1.0, class_weight='balanced', solver='newton-cg',
-            multi_class='multinomial', random_state=random_state)
+            multi_class='multinomial', random_state=random_state, max_iter=1000, tol=0.01)
         clf_pipe = make_pipeline(StandardScaler(), log_reg)
 
         # estimate learning curve specifications
@@ -194,7 +191,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             cv=5,
             scoring='accuracy',
             n_jobs=-1,
-            train_sizes = train_sizes,
+            train_sizes = np.logspace(0, 1, 20)/10,
             shuffle=True
         )
 
@@ -276,7 +273,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         # re-init logistic regression
         log_reg = LogisticRegression(
             penalty='l2', C=1.0, class_weight='balanced', solver='newton-cg',
-            multi_class='multinomial', random_state=random_state)
+            multi_class='multinomial', random_state=random_state, max_iter=1000, tol=0.01)
         fs_pipe = make_pipeline(StandardScaler(), log_reg)
 
         raw_train_sizes, raw_train_scores, raw_test_scores = learning_curve(
@@ -286,11 +283,11 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             cv=5,
             scoring='accuracy',
             n_jobs=-1,
-            train_sizes = train_sizes,
+            train_sizes = np.logspace(0, 1, 20)/10,
             shuffle=True
         )
 
-        assert ssl_train_sizes == raw_train_sizes, 'train sizes for SSL and FS logit should be identical!'
+        np.testing.assert_array_equal(ssl_train_sizes, raw_train_sizes)
 
         # Fit and score the logistic regression on raw vectors
         fs_pipe.fit(*raw_data['train'])
@@ -325,17 +322,14 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
 
         # plotting learning curves
         p.plot_learning_curves(
-            train_sizes,
+            ssl_train_sizes,
+            raw_train_sizes,
             ssl_train_scores=ssl_train_scores, 
             ssl_test_scores=ssl_test_scores, 
             raw_train_scores=raw_train_scores, 
             raw_test_scores=raw_test_scores, 
             dataset_name=dataset_name
         )
-
-    plt.legend(loc="best")
-    plt.show()
-
 
 
 # ---------------------------------- PROCESSING FUNCTIONS ----------------------------------
