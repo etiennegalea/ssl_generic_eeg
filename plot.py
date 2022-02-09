@@ -200,14 +200,14 @@ class Plot:
 
         # fill in std deviation for SSL
         ax.fill_between(
-            train_sizes,
+            ssl_train_sizes,
             ssl_train_scores_mean - ssl_train_scores_std,
             ssl_train_scores_mean + ssl_train_scores_std,
             alpha=0.1,
             color="r",
         )
         ax.fill_between(
-            train_sizes,
+            ssl_train_sizes,
             ssl_test_scores_mean - ssl_test_scores_std,
             ssl_test_scores_mean + ssl_test_scores_std,
             alpha=0.1,
@@ -216,14 +216,14 @@ class Plot:
 
         # fill in std deviation for FS
         ax.fill_between(
-            train_sizes,
+            raw_train_sizes,
             raw_train_scores_mean - raw_train_scores_std,
             raw_train_scores_mean + raw_train_scores_std,
             alpha=0.1,
             color="g",
         )
         ax.fill_between(
-            train_sizes,
+            raw_train_sizes,
             raw_test_scores_mean - raw_test_scores_std,
             raw_test_scores_mean + raw_test_scores_std,
             alpha=0.1,
@@ -234,10 +234,10 @@ class Plot:
         ax.set_ylabel("Score")
 
         ax.set_title(f'Fully-Supervised and Self-Supervised Logistic Regression scores per Training Example for {dataset_name} dataset')
-        plt.plot(train_sizes, ssl_train_scores_mean, color='r', label='SSL Training Score')
-        plt.plot(train_sizes, ssl_test_scores_mean, '--', color='r', label='SSL Cross-Validation')
-        plt.plot(train_sizes, raw_train_scores_mean, color='g', label='FS Training Score')
-        plt.plot(train_sizes, raw_test_scores_mean, '--', color='g', label='FS Cross-Validation')
+        plt.plot(ssl_train_sizes, ssl_train_scores_mean, color='r', label='SSL Training Score')
+        plt.plot(ssl_train_sizes, ssl_test_scores_mean, '--', color='r', label='SSL Cross-Validation')
+        plt.plot(raw_train_sizes, raw_train_scores_mean, color='g', label='FS Training Score')
+        plt.plot(raw_train_sizes, raw_test_scores_mean, '--', color='g', label='FS Cross-Validation')
         plt.legend(loc="best")
 
         self._plot(plt, 'logit_learning_curves')
