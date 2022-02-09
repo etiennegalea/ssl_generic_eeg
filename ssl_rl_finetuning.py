@@ -98,15 +98,15 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
     # load the pretrained model
     # (load the best model)
     if load_latest_model:
-        # model_dir = "./models/pretrained/"
-        model_dir = "/home/maligan/Documents/VU/Year_2/M.Sc._Thesis_[X_400285]/my_thesis/code/ssl_thesis/models/pretrained/"
+        model_dir = "./models/pretrained/"
+        # model_dir = "/home/maligan/Documents/VU/Year_2/M.Sc._Thesis_[X_400285]/my_thesis/code/ssl_thesis/models/pretrained/"
         files = [os.path.join(model_dir, fname) for fname in os.listdir(model_dir)]
         latest = max(files, key=os.path.getmtime).split(model_dir)[1].split('.')[0]
         print(f":: loading the latest pretrained model: {latest}")
         model = torch.load(f"{model_dir}{latest}.model")
     else:
-        # model = torch.load("models/pretrained/2021_12_16__10_23_49_sleep_staging_5s_windows_83_subjects_cpu_15_epochs_100hz.model")
-        model = torch.load("models/pretrained/2022_01_31__12_02_47_sleep_staging_5s_windows_5_subjects_cpu_15_epochs_100hz.model")
+        model = torch.load("models/pretrained/2021_12_16__10_23_49_sleep_staging_5s_windows_83_subjects_cpu_15_epochs_100hz.model")
+        # model = torch.load("models/pretrained/2022_01_31__12_02_47_sleep_staging_5s_windows_5_subjects_cpu_15_epochs_100hz.model")
 
     print(model)
 
