@@ -102,17 +102,25 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
     # DOWNSTREAM TASK - FINE TUNING)
     if load_feature_vectors is None:
 
-        options = {
-            'sleep_staging': [load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq), ['W', 'N1', 'N2', 'N3', 'R']],
-            'bci': [load_bci_data(subject_size, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples), ['T0', 'T1', 'T2']],
-            'tuh_abnormal': [load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples), ['abnormal', 'normal']],
-            'space_bambi': [load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s), ['artifact', 'non-artifact', 'ignored']] ,
-            'scopolamine': [load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples), ['M01', 'M05', 'M11']],
-            'white_noise': [load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples), ['abnormal', 'normal', 'white_noise']],
-        }
+        if dataset_name == 'sleep_staging':
+            windows_dataset = load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq)
+            annotations = ['W', 'N1', 'N2', 'N3', 'R']
+        elif dataset_name == 'bci':
+            windows_dataset = load_bci_data(subject_size, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
+            annotations = ['T0', 'T1', 'T2']
+        elif dataset_name == 'tuh_abnormal':
+            windows_dataset = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
+            annotations = ['abnormal', 'normal']
+        elif dataset_name == 'space_bambi':
+            windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
+            annotations = ['artifact', 'non-artifact', 'ignored']
+        elif dataset_name == 'scopolamine':
+            windows_dataset = load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
+            annotations = ['M01', 'M05', 'M11']
+        elif dataset_name == 'white_noise':
+            windows_dataset = load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
+            annotations = ['abnormal', 'normal', 'white_noise']
 
-        windows_dataset = options[dataset_name][0]
-        annotations = options[dataset_name][1]
 
         # print all parameter vars
         setup = tabulate(locals().items(), tablefmt='fancy_grid')
