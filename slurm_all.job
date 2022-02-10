@@ -1,0 +1,40 @@
+#!/bin/bash
+#SBATCH --time=10:00:00
+#SBATCH --output=output.log
+#SBATCH --error=error.log
+#SBATCH -N 4
+#SBATCH --ntasks-per-node=16
+#SBATCH -C TitanX
+#SBATCH --gres=gpu:1
+
+# Load GPU drivers
+#module load cuda10.1/toolkit
+#module load cuDNN/cuda10.1
+
+# This loads the anaconda virtual environment with our packages
+source /home/ega470/.bashrc
+
+# Base directory for the experiment
+cd /var/scratch/ega470/ssl_thesis/
+
+# Simple trick to create a unique directory for each run of the script
+#OUTPUT_DIR=SB100E8B6Conv101Dil112481FCPool500HD32LR0,0001MMWL
+#OUTPUT_DIR=TEST02
+#mkdir "$OUTPUT_DIR"
+#cd "$OUTPUT_DIR"
+
+python -V
+
+# Run the actual experiment
+#python -u /var/scratch/ega470/ssl_thesis/ssl_rl_pretraining.py --dataset_name='sleep_staging'
+python -u /var/scratch/ega470/ssl_thesis/ssl_rl_finetuning.py --dataset_name='sleep_staging' --n_jobs=16 --window_size_s=5 --sfreq=100 --batch_size=512 --connectivity_plot=True --edge_bundling_plot=True
+
+python -u /var/scratch/ega470/ssl_thesis/ssl_rl_finetuning.py --dataset_name='space_bambi' --n_jobs=16 --window_size_s=5 --sfreq=100 --batch_size=512 --connectivity_plot=True --edge_bundling_plot=True
+
+python -u /var/scratch/ega470/ssl_thesis/ssl_rl_finetuning.py --dataset_name='tuh_abnormal' --n_jobs=16 --window_size_s=5 --sfreq=100 --batch_size=512 --connectivity_plot=True --edge_bundling_plot=True
+
+python -u /var/scratch/ega470/ssl_thesis/ssl_rl_finetuning.py --dataset_name='scopolamine' --n_jobs=16 --window_size_s=5 --sfreq=100 --batch_size=512 --connectivity_plot=True --edge_bundling_plot=True
+
+python -u /var/scratch/ega470/ssl_thesis/ssl_rl_finetuning.py --dataset_name='white_noise' --n_jobs=16 --window_size_s=5 --sfreq=100 --batch_size=512 --connectivity_plot=True --edge_bundling_plot=True
+
+python -u /var/scratch/ega470/ssl_thesis/ssl_rl_finetuning.py --dataset_name='bci' --n_jobs=16 --window_size_s=5 --sfreq=100 --batch_size=512 --connectivity_plot=True --edge_bundling_plot=True
