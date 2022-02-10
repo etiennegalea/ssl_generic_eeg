@@ -57,7 +57,7 @@ from segment import Segmenter
 @click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
 # @click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
 @click.option('--random_state', default=87, help='Set a static random state so that the same result is generated everytime.')
-@click.option('--n_jobs', default=1, help='Number of subprocesses to run.')
+@click.option('--n_jobs', default=2, help='Number of subprocesses to run.')
 @click.option('--window_size_s', default=5, help='Window sizes in seconds.')
 @click.option('--high_cut_hz', '--hfreq', '-h', default=30, help='High-pass filter frequency.')
 @click.option('--low_cut_hz', '--lfreq', '-l', default=0.5, help='Low-pass filter frequency.')
@@ -189,9 +189,9 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             X=X,
             y=y,
             cv=5,
-            scoring='accuracy',
+            scoring='balanced_accuracy',
             n_jobs=-1,
-            train_sizes = np.logspace(0, 1, 20)/10,
+            train_sizes = np.linspace(0.00001,1,20),
             shuffle=True
         )
 
@@ -257,14 +257,14 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
 
 
     ### Visualizing clusters
-    # p.plot_PCA(X, y, annotations)
-    # p.plot_TSNE(X, y, annotations)
-    # p.plot_UMAP(X, y, annotations)
-    # if connectivity_plot:
-    #     p.plot_UMAP_connectivity(X)
-    # if edge_bundling_plot:
-    #     p.plot_UMAP_connectivity(X, edge_bundling=True)
-    # p.plot_UMAP_3d(X, y)
+    p.plot_PCA(X, y, annotations)
+    p.plot_TSNE(X, y, annotations)
+    p.plot_UMAP(X, y, annotations)
+    if connectivity_plot:
+        p.plot_UMAP_connectivity(X)
+    if edge_bundling_plot:
+        p.plot_UMAP_connectivity(X, edge_bundling=True)
+    p.plot_UMAP_3d(X, y)
 
 
     ### Train a fully-supervised logistic regresion for comparison and evaluation
@@ -281,9 +281,9 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             X=X_raw,
             y=y_raw,
             cv=5,
-            scoring='accuracy',
+            scoring='balanced_accuracy',
             n_jobs=-1,
-            train_sizes = np.logspace(0, 1, 20)/10,
+            train_sizes = np.linspace(0.00001,1,40),
             shuffle=True
         )
 
@@ -509,7 +509,7 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
     print(f'{len(os.listdir(data_dir))} files found')
     for i, path in enumerate(os.listdir(data_dir)):
         # limiter
-        if i == 40:
+        if i == 5:
             break
             
         full_path = os.path.join(data_dir, path)
