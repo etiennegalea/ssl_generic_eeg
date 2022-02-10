@@ -500,8 +500,8 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
     print(':: loading SPACE/BAMBI data')
 
     # space_bambi directory
-    # data_dir = './data/SPACE_BAMBI_2channels/'
-    data_dir = '/media/maligan/My Passport/msc_thesis/data/SPACE_BAMBI_2channels/'
+    data_dir = './data/SPACE_BAMBI_2channels/'
+    # data_dir = '/media/maligan/My Passport/msc_thesis/data/SPACE_BAMBI_2channels/'
 
     raws = []
     # added = 0
@@ -509,8 +509,8 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
     print(f'{len(os.listdir(data_dir))} files found')
     for i, path in enumerate(os.listdir(data_dir)):
         # limiter
-        if i == 5:
-            break
+        #if i == 5:
+        #    break
             
         full_path = os.path.join(data_dir, path)
         raw = mne.io.read_raw_fif(full_path)
