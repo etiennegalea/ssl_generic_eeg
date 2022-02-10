@@ -93,7 +93,7 @@ class Plot:
         colors = cm.get_cmap('plasma', n_stages)(range(n_stages))
         for i, stage in enumerate(annotations):
             mask = y == i
-            ax.scatter(components[mask, 0], components[mask, 1], s=2, alpha=0.7,
+            ax.scatter(components[mask, 0], components[mask, 1], s=1, alpha=0.7,
                     color=colors[i], label=stage)
         ax.legend()
 
@@ -115,7 +115,7 @@ class Plot:
         colors = cm.get_cmap('plasma', n_stages)(range(n_stages))
         for i, stage in enumerate(annotations):
             mask = y == i
-            ax.scatter(components[mask, 0], components[mask, 1], s=2, alpha=0.7,
+            ax.scatter(components[mask, 0], components[mask, 1], s=1, alpha=0.7,
                     color=colors[i], label=stage)
         ax.legend()
 
@@ -136,7 +136,7 @@ class Plot:
         colors = cm.get_cmap('plasma', n_stages)(range(n_stages))
         for i, stage in enumerate(annotations):
             mask = y == i
-            ax.scatter(umap_components[mask, 0], umap_components[mask, 1], s=2, alpha=0.7,
+            ax.scatter(umap_components[mask, 0], umap_components[mask, 1], s=1, alpha=0.7,
             color=colors[i], label=stage)
         ax.legend()
 

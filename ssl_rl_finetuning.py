@@ -52,9 +52,9 @@ from segment import Segmenter
 
 ### Load model
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='space_bambi', help='Dataset for downstream task.')
-# @click.option('--dataset_name', '--dataset', '-n', default='test_sleep_staging', help='Dataset for downstream task.')
-@click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
+@click.option('--dataset_name', '--dataset', '-n', default='space_bambi', help='Dataset for downstream task: \
+    "space_bambi", "sleep_staging", "tuh_abnormal", "scopolamine", "white_noise", "bci".')
+@click.option('--subject_size', default='all', help='sample (0-5), some (0-40), all (83)')
 # @click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
 @click.option('--random_state', default=87, help='Set a static random state so that the same result is generated everytime.')
 @click.option('--n_jobs', default=2, help='Number of subprocesses to run.')
@@ -67,25 +67,14 @@ from segment import Segmenter
 @click.option('--n_channels', default=2, help='Number of channels.')
 @click.option('--connectivity_plot', default=False, help='Plot UMAP connectivity plot.')
 @click.option('--edge_bundling_plot', default=False, help='Plot UMAP connectivity plot with edge bundling (takes a long time).')
-# @click.option('--annotations', default=['W', 'N1', 'N2', 'N3', 'R'], help='Annotations for plotting.')
-# @click.option('--annotations', default=['T0', 'T1', 'T2'], help='Annotations for plotting.')
-# @click.option('--annotations', default=['abnormal', 'normal'], help='Annotations for plotting.')
-@click.option('--annotations', default=['artifact', 'non-artifact', 'ignored'], help='Annotations for plotting.')
-# @click.option('--annotations', default=['M01', 'M05', 'M11'], help='Annotations for plotting.')
-# @click.option('--annotations', default=['white_noise', 'normal_noise'], help='Annotations for plotting.')
-# @click.option('--annotations', default=['abnormal', 'normal', 'white_noise'], help='Annotations for plotting.')
 @click.option('--show_plots', '--show', default=False, help='Show plots.')
 @click.option('--load_feature_vectors', default=None, help='Load feature vectors passed through SSL model (input name of vector file).')
 @click.option('--load_latest_model', default=False, help='Load the latest pretrained model from the ssl_rl_pretraining.py script.')
 @click.option('--fully_supervised', default=True, help='Train a fully-supervised model for comparison with the downstream task.')
 
 
-def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cut_hz, high_cut_hz, sfreq, lr, batch_size, n_channels, connectivity_plot, edge_bundling_plot, annotations, show_plots, load_feature_vectors, load_latest_model, fully_supervised):
+def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cut_hz, high_cut_hz, sfreq, lr, batch_size, n_channels, connectivity_plot, edge_bundling_plot, show_plots, load_feature_vectors, load_latest_model, fully_supervised):
     print(':: STARTING MAIN ::')
-    
-    # print all parameter vars
-    setup = tabulate(locals().items(), tablefmt='fancy_grid')
-    print(setup)
     
     # print local parameters
     # set device to 'cuda' or 'cpu'
@@ -112,15 +101,22 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
 
     # DOWNSTREAM TASK - FINE TUNING)
     if load_feature_vectors is None:
-        # windows_dataset = load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq)
-        # data, descriptions = load_sleep_staging_raws()
-        # windows_dataset = load_bci_data(subject_size, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
-        # windows_dataset = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
-        # windows_dataset = load_scopolamine_abnormal_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
-        # windows_dataset = load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
-        windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
-        # windows_dataset = load_generated_noisy_signals(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
-        # windows_dataset = load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
+
+        options = {
+            'sleep_staging': [load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq), ['W', 'N1', 'N2', 'N3', 'R']],
+            'bci': [load_bci_data(subject_size, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples), ['T0', 'T1', 'T2']],
+            'tuh_abnormal': [load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples), ['abnormal', 'normal']],
+            'space_bambi': [load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s), ['artifact', 'non-artifact', 'ignored']] ,
+            'scopolamine': [load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples), ['M01', 'M05', 'M11']],
+            'white_noise': [load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples), ['abnormal', 'normal', 'white_noise']],
+        }
+
+        windows_dataset = options[dataset_name][0]
+        annotations = options[dataset_name][1]
+
+        # print all parameter vars
+        setup = tabulate(locals().items(), tablefmt='fancy_grid')
+        print(setup)
 
         # split by subject
         subjects = np.unique(windows_dataset.description['subject'])
@@ -378,7 +374,9 @@ def create_windows_dataset(raws, window_size_samples, descriptions=None, mapping
 def load_bci_data(subject_size, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
     print(':: loading BCI data')
 
-    ''' ANNOTATIONS
+    '''
+    ANNOTATIONS
+
     T0 corresponds to rest
     T1 corresponds to onset of motion (real or imagined) of
         the left fist (in runs 3, 4, 7, 8, 11, and 12)
@@ -386,15 +384,28 @@ def load_bci_data(subject_size, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_s
     T2 corresponds to onset of motion (real or imagined) of
         the right fist (in runs 3, 4, 7, 8, 11, and 12)
         both feet (in runs 5, 6, 9, 10, 13, and 14)
+
+    =========  ===================================
+    run        task
+    =========  ===================================
+    1          Baseline, eyes open
+    2          Baseline, eyes closed
+    3, 7, 11   Motor execution: left vs right hand
+    4, 8, 12   Motor imagery: left vs right hand
+    5, 9, 13   Motor execution: hands vs feet
+    6, 10, 14  Motor imagery: hands vs feet
+    =========  ===================================
+
     '''
     print(subject_size)
     print(type(subject_size))
     subjects = range(subject_size[0], subject_size[1]) # max 110
     event_codes = [
-        1, 2, # eyes open, eyes closed (baselines)
-        3, 4, 5,
-        6, 7, 8, 9, 
-        10, 11, 12, 13, 14
+        1, 2,       # eyes open, eyes closed (baselines)
+        3, 7, 11,   # Motor execution: left vs right hand
+        4, 8, 12,   # Motor imagery: left vs right hand
+        5, 9, 13,   # Motor execution: hands vs feet
+        6, 10, 14   # Motor imagery: hands vs feet
     ]
 
     physionet_paths, descriptions = [], []
@@ -479,23 +490,6 @@ def load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_sample
     return windows_dataset
 
 
-def load_sleep_staging_raws():
-    print(':: loading SLEEP STAGING raws')
-    raw_set = [
-        '/home/maligan/mne_data/physionet-sleep-data/SC4012E0-PSG.edf'
-        '/home/maligan/mne_data/physionet-sleep-data/SC4451F0-PSG.edf'
-        '/home/maligan/mne_data/physionet-sleep-data/SC4441E0-PSG.edf'
-        '/home/maligan/mne_data/physionet-sleep-data/SC4431E0-PSG.edf'
-        '/home/maligan/mne_data/physionet-sleep-data/SC4421E0-PSG.edf'
-    ]
-
-    # load into raw array
-    raws = [mne.io.read_raw_edf(x) for x in raw_set]
-    # mne.io.RawArray(raws)
-
-    return raws, None
-
-
 def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s):
     print(':: loading SPACE/BAMBI data')
 
@@ -504,12 +498,11 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
     # data_dir = '/media/maligan/My Passport/msc_thesis/data/SPACE_BAMBI_2channels/'
 
     raws = []
-    # added = 0
 
     print(f'{len(os.listdir(data_dir))} files found')
     for i, path in enumerate(os.listdir(data_dir)):
         # limiter
-        #if i == 5:
+        # if i == 5:
         #    break
             
         full_path = os.path.join(data_dir, path)
@@ -544,12 +537,7 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
 
     windows_dataset = create_windows_from_events(
         ds, 
-        # trial_start_offset_samples = 0,
-        # trial_stop_offset_samples = 0,
-        # window_size_samples = window_size_samples,
-        # window_stride_samples = window_size_samples,
         mapping = mapping,
-        # preload = True,
     )
 
 
@@ -594,9 +582,12 @@ def load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sa
     print(':: loading SCOPOLAMINE data')
 
     # 11 measurements times from 0.5 hrs to 8.5 hrs after Scopolamine (or placebo) administration
-    m01 = '/media/maligan/My Passport/msc_thesis/data/scopolamine/M01/'
-    m05 = '/media/maligan/My Passport/msc_thesis/data/scopolamine/M05/'
-    m11 = '/media/maligan/My Passport/msc_thesis/data/scopolamine/M11/'
+    m01 = 'data/scopolamine/M01/'
+    # m01 = '/media/maligan/My Passport/msc_thesis/data/scopolamine/M01/'
+    m05 = 'data/scopolamine/M05/'
+    # m05 = '/media/maligan/My Passport/msc_thesis/data/scopolamine/M05/'
+    m11 = 'data/scopolamine/M11/'
+    # m11 = '/media/maligan/My Passport/msc_thesis/data/scopolamine/M11/'
 
     dataset, descriptions = [], []
     info = mne.create_info(ch_names=['Fpz-cz', 'Pz-Oz'], ch_types=['eeg']*2, sfreq=1012)
@@ -631,8 +622,10 @@ def load_scopolamine_test_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_si
     print(':: loading SCOPOLAMINE data')
 
     # 11 measurements times from 0.5 hrs to 8.5 hrs after Scopolamine (or placebo) administration
-    m01 = '/media/maligan/My Passport/msc_thesis/data/scopolamine/M01/'
-    m11 = '/media/maligan/My Passport/msc_thesis/data/scopolamine/M11/'
+    m01 = 'data/scopolamine/M01/'
+    # m01 = '/media/maligan/My Passport/msc_thesis/data/scopolamine/M01/'
+    m11 = 'data/scopolamine/M11/'
+    # m11 = '/media/maligan/My Passport/msc_thesis/data/scopolamine/M11/'
 
     dataset, descriptions = [], []
     info = mne.create_info(ch_names=['Fpz-cz', 'Pz-Oz'], ch_types=['eeg']*2, sfreq=1012)
@@ -660,83 +653,11 @@ def load_scopolamine_test_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_si
     return windows_dataset
 
 
-# load scopolamine dataset w/ also load abnormal dataset as sample for normal (and abnormal) classifcations
-def load_scopolamine_abnormal_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
-    from  mat73 import loadmat
-    import mne
-
-    print(':: loading SCOPOLAMINE data')
-
-    scop_dir = '/home/maligan/Documents/VU/Year_2/M.Sc._Thesis_[X_400285]/my_thesis/code/ssl_thesis/data/scopolamine/mats/raws/'
-
-    mats = os.listdir(scop_dir)
-
-    scp_raws, scp_desc = [], []
-    info = mne.create_info(ch_names=['Fpz-cz', 'Pz-Oz'], ch_types=['eeg']*2, sfreq=1012)
-
-    # creating scopolamine raw data
-    for i, mat in enumerate(mats):
-        print(mat)
-        # select columns 3 and 4 (Fpz-Cz, and Pz-Oz respectively) and convert to microvolts
-        x = loadmat(scop_dir + mat)['RawSignal'][:, [2,3]].T / 100000
-        raw = mne.io.RawArray(x, info)
-        scp_raws += [raw.set_annotations(mne.Annotations(onset=[0], duration=raw.times.max(), description=['scopolamine']))]
-        scp_desc += [{'subject': 1, 'recording': i}]
-
-    # creating sample abnormal raw data
-    # ----------------------------- TEMP -------------------------------------------------
-
-    abn_dir = [
-        '/media/maligan/My Passport/msc_thesis/ssl_thesis/data/tuh_abnormal_data/eval/abnormal/007/00000768/s003_2012_04_06/00000768_s003_t000.edf_2_channels.fif',
-        '/media/maligan/My Passport/msc_thesis/ssl_thesis/data/tuh_abnormal_data/eval/abnormal/011/00001154/s007_2012_07_25/00001154_s007_t000.edf_2_channels.fif'
-    ]
-    norm_dir = [
-        '/media/maligan/My Passport/msc_thesis/ssl_thesis/data/tuh_abnormal_data/eval/normal/006/00000647/s002_2009_09_21/00000647_s002_t000.edf_2_channels.fif',
-        '/media/maligan/My Passport/msc_thesis/ssl_thesis/data/tuh_abnormal_data/eval/normal/013/00001355/s003_2009_12_08/00001355_s003_t000.edf_2_channels.fif'
-    ]
-    
-
-    # only 1 rec per subject (temporary)
-    def make_raws(_class, dataset=[], descriptions=[]):
-        for i, path in enumerate(abn_dir):
-            raw = mne.io.read_raw_fif(path)
-            raw = raw.set_annotations(mne.Annotations(onset=[0], duration=raw.times.max(), description=[_class]))
-            dataset.append(raw)
-            descriptions += [{'subject': len(descriptions)+1, 'recording': 1}]
-
-        return dataset, descriptions
-        
-    dataset, descriptions = make_raws('abnormal')
-    dataset, descriptions = make_raws('normal', dataset, descriptions)
-
-    dataset += scp_raws
-    descriptions += scp_desc
-
-    # -----------------------------------------------------------------------------------
-
-    for i, x in enumerate(dataset):
-        print(dataset[i], descriptions[i])
-
-
-    # preprocess dataset
-    dataset = preprocess_raws(dataset, sfreq, low_cut_hz, high_cut_hz, n_jobs)
-
-    mapping = {
-        'abnormal': 0,
-        'normal': 1,
-        'scopolamine': 2
-    }
-
-    # create windows
-    windows_dataset = create_windows_dataset(dataset, window_size_samples, descriptions, mapping)
-
-    return windows_dataset
-
-
 def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
     print(':: loading TUH abnormal data')
 
-    data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
+    data_dir = 'data/tuh_abnormal_data/eval/'
+    # data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
 
     # build data dictionary
     annotations = {}
@@ -845,7 +766,8 @@ def load_generated_noisy_signals(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_
 def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
     print(':: loading TUH abnormal data + white noise')
 
-    data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
+    data_dir = 'data/tuh_abnormal_data/eval/'
+    # data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
 
     # build data dictionary
     annotations = {}
@@ -899,9 +821,9 @@ def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size
 
 
     # limiters
-    raw_paths = raw_paths[:50]
-    descriptions = descriptions[:50]
-    classification = classification[:50]
+    # raw_paths = raw_paths[:50]
+    # descriptions = descriptions[:50]
+    # classification = classification[:50]
 
     # load data and set annotations
     dataset = []
@@ -916,7 +838,6 @@ def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size
     for i in range(len(raw_paths)):
         dataset += [hf.generate_white_noise_raws(n_times=50000)]
         descriptions += [{'subject': i}]
-
 
     # ---------------------------------------------------------------
 
