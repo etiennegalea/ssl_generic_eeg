@@ -6,9 +6,8 @@ from matplotlib.lines import Line2D
 from matplotlib import cm
 import seaborn as sns
 
-import umap.plot
+from umap import plot, UMAP
 import umap.umap_ as UMAP
-from umap import UMAP
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 import plotly.express as px
