@@ -67,13 +67,14 @@ from segment import Segmenter
 @click.option('--n_channels', default=2, help='Number of channels.')
 @click.option('--connectivity_plot', default=False, help='Plot UMAP connectivity plot.')
 @click.option('--edge_bundling_plot', default=False, help='Plot UMAP connectivity plot with edge bundling (takes a long time).')
+@click.option('--plot_heavy', '-p', default=True, help='Plot heavy CPU intensive plots.')
 @click.option('--show_plots', '--show', default=False, help='Show plots.')
 @click.option('--load_feature_vectors', default=None, help='Load feature vectors passed through SSL model (input name of vector file).')
 @click.option('--load_latest_model', default=False, help='Load the latest pretrained model from the ssl_rl_pretraining.py script.')
 @click.option('--fully_supervised', default=True, help='Train a fully-supervised model for comparison with the downstream task.')
 
 
-def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cut_hz, high_cut_hz, sfreq, lr, batch_size, n_channels, connectivity_plot, edge_bundling_plot, show_plots, load_feature_vectors, load_latest_model, fully_supervised):
+def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cut_hz, high_cut_hz, sfreq, lr, batch_size, n_channels, connectivity_plot, edge_bundling_plot, plot_heavy, show_plots, load_feature_vectors, load_latest_model, fully_supervised):
     print(':: STARTING MAIN ::')
     
     # print local parameters
@@ -261,14 +262,15 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
 
 
     ### Visualizing clusters
-    p.plot_PCA(X, y, annotations)
-    p.plot_TSNE(X, y, annotations)
-    p.plot_UMAP(X, y, annotations)
-    if connectivity_plot:
-        p.plot_UMAP_connectivity(X)
-    if edge_bundling_plot:
-        p.plot_UMAP_connectivity(X, edge_bundling=True)
-    p.plot_UMAP_3d(X, y)
+    if plot_heavy:
+        p.plot_PCA(X, y, annotations)
+        p.plot_TSNE(X, y, annotations)
+        p.plot_UMAP(X, y, annotations)
+        if connectivity_plot:
+            p.plot_UMAP_connectivity(X)
+        if edge_bundling_plot:
+            p.plot_UMAP_connectivity(X, edge_bundling=True)
+        p.plot_UMAP_3d(X, y)
 
 
     ### Train a fully-supervised logistic regresion for comparison and evaluation
