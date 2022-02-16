@@ -52,7 +52,7 @@ from segment import Segmenter
 
 ### Load model
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='space_bambi', help='Dataset for downstream task: \
+@click.option('--dataset_name', '--dataset', '-n', default='white_noise', help='Dataset for downstream task: \
     "space_bambi", "sleep_staging", "tuh_abnormal", "scopolamine", "white_noise", "bci".')
 @click.option('--subject_size', default='all', help='sample (0-5), some (0-40), all (83)')
 # @click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
@@ -121,6 +121,9 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         elif dataset_name == 'white_noise':
             windows_dataset = load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
             annotations = ['abnormal', 'normal', 'white_noise']
+        elif dataset_name == 'tuar':
+            windows_dataset = load_tuar_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
+            annotations = ['eyem', 'chew', 'shiv', 'musc', 'elec']
 
 
         # print all parameter vars
@@ -831,9 +834,9 @@ def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size
 
 
     # limiters
-    # raw_paths = raw_paths[:50]
-    # descriptions = descriptions[:50]
-    # classification = classification[:50]
+    raw_paths = raw_paths[:50]
+    descriptions = descriptions[:50]
+    classification = classification[:50]
 
     # load data and set annotations
     dataset = []
@@ -846,7 +849,7 @@ def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size
     # -------------------- NOISE GEN --------------------------------
 
     for i in range(len(raw_paths)):
-        dataset += [hf.generate_white_noise_raws(n_times=50000)]
+        dataset += [hf.generate_white_noise_raws(n_times=5000)]
         descriptions += [{'subject': i}]
 
     # ---------------------------------------------------------------
@@ -863,6 +866,89 @@ def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size
         'abnormal': 0,
         'normal': 1,
         'white_noise': 2
+    }
+
+    # create windows
+    windows_dataset = create_windows_dataset(dataset, window_size_samples, descriptions, mapping)
+
+    return windows_dataset
+
+
+def load_tuar_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
+    print(':: loading TUAR data')
+
+    # data_dir = 'data/tuar/v2.1.0/edf/01_tcp_ar/'
+    data_dir = '/media/maligan/My Passport/msc_thesis/data/tuar/v2.1.0/edf/01_tcp_ar/'
+
+    # build data dictionary
+    subjects = {}
+    for subject in hf.get_file_list(data_dir):
+        recordings = {}
+        for recording in hf.get_file_list(subject):
+            dates = {}
+            for date in hf.get_file_list(recording):
+                for raw_path in hf.get_file_list(date):
+                    if '_2_channels.fif' in hf.get_id(raw_path):
+                        break
+                    else:
+                        pass
+                dates[hf.get_id(date)] = raw_path
+            recordings[hf.get_id(recording)] = dates
+        subjects[hf.get_id(subject)] = recordings
+    
+
+    df = pd.json_normalize(subjects, sep='_').T
+
+    # paths list
+    raw_paths = [df.iloc[i][0] for i in range(len(df))]
+
+    # define abnormal and normal subjects
+    
+    abnormal_subjects = subjects['abnormal'].keys()
+    normal_subjects = subjects['normal'].keys()
+
+    # define descriptions (recoding per subject)
+    abnormal_descriptions, normal_descriptions, classification = [], [], []
+    for id in abnormal_subjects:
+        for recording in subjects['abnormal'][id].values():
+            for x in recording.keys():
+                abnormal_descriptions += [{'subject': int(id), 'recording': x}]
+                classification += ['abnormal']
+    for id in normal_subjects:
+        for recording in subjects['normal'][id].values():
+            for x in recording.keys():
+                normal_descriptions += [{'subject': int(id), 'recording': x}]
+                classification += ['normal']
+
+    descriptions = abnormal_descriptions + normal_descriptions
+
+    # shuffle raw_paths and descriptions
+    from sklearn.utils import shuffle
+    raw_paths, descriptions, classification = shuffle(raw_paths, descriptions, classification)
+
+    # limiters
+    raw_paths = raw_paths[:50]
+    descriptions = descriptions[:50]
+    classification = classification[:50]
+
+    # load data and set annotations
+    dataset = []
+    for i, path in enumerate(raw_paths):
+        _class = classification[i]
+        raw = mne.io.read_raw_fif(path, preload=True)
+        raw = raw.set_annotations(mne.Annotations(onset=[0], duration=raw.times.max(), description=[_class]))
+        dataset.append(raw)
+
+    pp = pprint.PrettyPrinter(indent=2)
+    pp.pprint(raw_paths)
+    pp.pprint(dataset)
+
+    # preprocess dataset
+    dataset = preprocess_raws(dataset, sfreq, low_cut_hz, high_cut_hz, n_jobs)
+
+    mapping = {
+        'abnormal': 0,
+        'normal': 1
     }
 
     # create windows
