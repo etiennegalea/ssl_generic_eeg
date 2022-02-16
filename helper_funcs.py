@@ -88,7 +88,7 @@ class HelperFuncs():
         data = noise + signal
 
         info = mne.create_info(ch_names, sfreq, ch_types)
-        raw = mne.io.RawArray(data/100000, info)
+        raw = mne.io.RawArray(data/1000000, info)
         raw = raw.set_annotations(mne.Annotations(onset=[0], duration=raw.times.max(), description=[stage]))
 
         return raw
@@ -111,7 +111,7 @@ class HelperFuncs():
         ])
 
         info = mne.create_info(ch_names, sfreq, ch_types)
-        raw = mne.io.RawArray(noise/100000, info)
+        raw = mne.io.RawArray(noise/1000000, info)
         raw = raw.set_annotations(mne.Annotations(onset=[0], duration=raw.times.max(), description=[stage]))
 
         return raw
