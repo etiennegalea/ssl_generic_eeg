@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --time=00:15:00
-#SBATCH --output=output.log
+#SBATCH --time=10:00:00
+#SBATCH --output=output_whitenoise.log
 #SBATCH --error=error.log
 #SBATCH -N 2
 #SBATCH --ntasks-per-node=16
@@ -25,9 +25,7 @@ cd /var/scratch/ega470/ssl_thesis/
 
 python -V
 
-# Pretraining
+# Run the actual experiment
 #python -u /var/scratch/ega470/ssl_thesis/ssl_rl_pretraining.py --dataset_name='sleep_staging'
 
-# Downstream task
-python -u /var/scratch/ega470/ssl_thesis/ssl_rl_finetuning.py --dataset_name='space_bambi' --n_jobs=16 --window_size_s=5 --sfreq=100 --batch_size=512 --connectivity_plot=False --edge_bundling_plot=False -p=False
-
+python -u /var/scratch/ega470/ssl_thesis/ssl_rl_finetuning.py --dataset_name='white_noise' --n_jobs=16 --window_size_s=5 --sfreq=100 --batch_size=512 --connectivity_plot=True --edge_bundling_plot=True
