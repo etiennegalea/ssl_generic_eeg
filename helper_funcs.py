@@ -98,16 +98,16 @@ class HelperFuncs():
         ch_names=['SIM0001', 'SIM0002'],
         ch_types=['eeg']*2,
         sfreq=100.0,
-        n_times=5000,
+        n_times=500,
         seed=42,
-        wave_hz=50.0,
+        # wave_hz=100.0,
         stage='white_noise',
         bound=1
     ):
 
         noise = np.array([
-            np.random.uniform(wave_hz-bound, wave_hz+bound, size=n_times), 
-            np.random.uniform(wave_hz-bound, wave_hz+bound, size=n_times)
+            np.random.uniform(sfreq-bound, sfreq+bound, size=n_times), 
+            np.random.uniform(sfreq-bound, sfreq+bound, size=n_times)
         ])
 
         info = mne.create_info(ch_names, sfreq, ch_types)
