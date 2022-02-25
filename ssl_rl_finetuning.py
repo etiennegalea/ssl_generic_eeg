@@ -202,13 +202,13 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         #     shuffle=True
         # )
 
-        ssl_space = np.linspace(0.01,1,20)
-        ssl_space = np.round(ssl_space*len(X)).astype(int)
+        ssl_space = np.linspace(0.0001,1,20)
+        ssl_space = np.ceil(ssl_space*len(X)).astype(int)
         # train statified SSL logit with CV to obtain learning scores
         ssl_train_scores = [np.array([0.0]*cv)]
         for i in ssl_space: 
             _X, _y = X[:i], y[:i]
-            ssl_train_scores += [cross_val_score(clf_pipe, _X, _y, cv=cv, scoring='f1_weighted')]
+            ssl_train_scores += [cross_val_score(clf_pipe, _X, _y, cv=cv, scoring='balanced_accuracy')]
 
         # Fit and score the logistic regression
         clf_pipe.fit(*data['train'])
@@ -316,13 +316,13 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         # )
 
 
-        raw_space = np.linspace(0.01,1,40)
-        raw_space = np.round(raw_space*len(X_raw)).astype(int)
+        raw_space = np.linspace(0.0001,1,40)
+        raw_space = np.ceil(raw_space*len(X_raw)).astype(int)
         # train statified FS logit with CV to obtain learning scores
         raw_train_scores = [np.array([0.0]*cv)]
         for i in raw_space: 
             _X, _y = X_raw[:i], y_raw[:i]
-            raw_train_scores += [cross_val_score(fs_pipe, _X, _y, cv=cv, scoring='f1_weighted')]
+            raw_train_scores += [cross_val_score(fs_pipe, _X, _y, cv=cv, scoring='balanced_accuracy')]
 
         # Fit and score the logistic regression on raw vectors
         fs_pipe.fit(*raw_data['train'])
