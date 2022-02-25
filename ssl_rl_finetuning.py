@@ -25,14 +25,11 @@ from braindecode.datautil.preprocess import zscore
 from braindecode.datasets import create_from_mne_raw
 
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import confusion_matrix
-from sklearn.metrics import classification_report
-from sklearn.metrics import balanced_accuracy_score
+from sklearn.metrics import confusion_matrix, classification_report, balanced_accuracy_score
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import make_pipeline
-from sklearn.model_selection import train_test_split
-from sklearn.model_selection import learning_curve
+from sklearn.model_selection import train_test_split, learning_curve, cross_val_score
 
 from  mat73 import loadmat
 import matplotlib.pyplot as plt
@@ -52,12 +49,12 @@ from segment import Segmenter
 
 ### Load model
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='white_noise', help='Dataset for downstream task: \
+@click.option('--dataset_name', '--dataset', '-n', default='sleep_staging', help='Dataset for downstream task: \
     "space_bambi", "sleep_staging", "tuh_abnormal", "scopolamine", "white_noise", "bci".')
-@click.option('--subject_size', default='all', help='sample (0-5), some (0-40), all (83)')
+@click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
 # @click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
 @click.option('--random_state', default=87, help='Set a static random state so that the same result is generated everytime.')
-@click.option('--n_jobs', default=2, help='Number of subprocesses to run.')
+@click.option('--n_jobs', default=1, help='Number of subprocesses to run.')
 @click.option('--window_size_s', default=5, help='Window sizes in seconds.')
 @click.option('--high_cut_hz', '--hfreq', '-h', default=30, help='High-pass filter frequency.')
 @click.option('--low_cut_hz', '--lfreq', '-l', default=0.5, help='Low-pass filter frequency.')
@@ -72,9 +69,11 @@ from segment import Segmenter
 @click.option('--load_feature_vectors', default=None, help='Load feature vectors passed through SSL model (input name of vector file).')
 @click.option('--load_latest_model', default=False, help='Load the latest pretrained model from the ssl_rl_pretraining.py script.')
 @click.option('--fully_supervised', default=True, help='Train a fully-supervised model for comparison with the downstream task.')
+@click.option('--cv', default=5, help='Cross-validation folds to use for logistic regression.')
 
 
-def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cut_hz, high_cut_hz, sfreq, lr, batch_size, n_channels, connectivity_plot, edge_bundling_plot, plot_heavy, show_plots, load_feature_vectors, load_latest_model, fully_supervised):
+
+def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cut_hz, high_cut_hz, sfreq, lr, batch_size, n_channels, connectivity_plot, edge_bundling_plot, plot_heavy, show_plots, load_feature_vectors, load_latest_model, fully_supervised, cv):
     print(':: STARTING MAIN ::')
     
     # print local parameters
@@ -188,20 +187,28 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         # Initialize the logistic regression model
         log_reg = LogisticRegression(
             penalty='l2', C=1.0, class_weight='balanced', solver='newton-cg',
-            multi_class='multinomial', random_state=random_state, max_iter=1000, tol=0.01)
+            multi_class='multinomial', random_state=random_state, max_iter=1000, tol=0.01, warm_start=True)
         clf_pipe = make_pipeline(StandardScaler(), log_reg)
 
         # estimate learning curve specifications
-        ssl_train_sizes, ssl_train_scores, ssl_test_scores = learning_curve(
-            clf_pipe,
-            X=X,
-            y=y,
-            cv=5,
-            scoring='balanced_accuracy',
-            n_jobs=-1,
-            train_sizes = np.linspace(0.00001,1,20),
-            shuffle=True
-        )
+        # ssl_train_sizes, ssl_train_scores, ssl_test_scores = learning_curve(
+        #     clf_pipe,
+        #     X=X,
+        #     y=y,
+        #     cv=5,
+        #     scoring='balanced_accuracy',
+        #     n_jobs=-1,
+        #     train_sizes = np.linspace(0.00001,1,20),
+        #     shuffle=True
+        # )
+
+        ssl_space = np.linspace(0.01,1,20)
+        ssl_space = np.round(ssl_space*len(X)).astype(int)
+        # train statified SSL logit with CV to obtain learning scores
+        ssl_train_scores = [np.array([0.0]*cv)]
+        for i in ssl_space: 
+            _X, _y = X[:i], y[:i]
+            ssl_train_scores += [cross_val_score(clf_pipe, _X, _y, cv=cv, scoring='f1_weighted')]
 
         # Fit and score the logistic regression
         clf_pipe.fit(*data['train'])
@@ -294,19 +301,28 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         # re-init logistic regression
         log_reg = LogisticRegression(
             penalty='l2', C=1.0, class_weight='balanced', solver='newton-cg',
-            multi_class='multinomial', random_state=random_state, max_iter=1000, tol=0.01)
+            multi_class='multinomial', random_state=random_state, max_iter=1000, tol=0.01, warm_start=True)
         fs_pipe = make_pipeline(StandardScaler(), log_reg)
 
-        raw_train_sizes, raw_train_scores, raw_test_scores = learning_curve(
-            fs_pipe,
-            X=X_raw,
-            y=y_raw,
-            cv=5,
-            scoring='balanced_accuracy',
-            n_jobs=-1,
-            train_sizes = np.linspace(0.00001,1,40),
-            shuffle=True
-        )
+        # raw_train_sizes, raw_train_scores, raw_test_scores = learning_curve(
+        #     fs_pipe,
+        #     X=X_raw,
+        #     y=y_raw,
+        #     cv=5,
+        #     scoring='balanced_accuracy',
+        #     n_jobs=-1,
+        #     train_sizes = np.linspace(0.00001,1,40),
+        #     shuffle=True
+        # )
+
+
+        raw_space = np.linspace(0.01,1,40)
+        raw_space = np.round(raw_space*len(X)).astype(int)
+        # train statified FS logit with CV to obtain learning scores
+        raw_train_scores = [np.array([0.0]*cv)]
+        for i in raw_space: 
+            _X, _y = X[:i], y[:i]
+            raw_train_scores += [cross_val_score(fs_pipe, _X, _y, cv=cv, scoring='f1_weighted')]
 
         # Fit and score the logistic regression on raw vectors
         fs_pipe.fit(*raw_data['train'])
@@ -340,13 +356,23 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             f.write(pprint.pformat(class_report, indent=4, sort_dicts=False))
 
         # plotting learning curves
+        # p.plot_learning_curves_sklearn(
+        #     ssl_train_sizes,
+        #     raw_train_sizes,
+        #     ssl_train_scores=ssl_train_scores, 
+        #     ssl_test_scores=ssl_test_scores, 
+        #     raw_train_scores=raw_train_scores, 
+        #     raw_test_scores=raw_test_scores, 
+        #     dataset_name=dataset_name
+        # )
+
+
+        # plotting learning curves
         p.plot_learning_curves(
-            ssl_train_sizes,
-            raw_train_sizes,
-            ssl_train_scores=ssl_train_scores, 
-            ssl_test_scores=ssl_test_scores, 
+            ssl_space,
+            raw_space,
+            ssl_train_scores=ssl_train_scores,
             raw_train_scores=raw_train_scores, 
-            raw_test_scores=raw_test_scores, 
             dataset_name=dataset_name
         )
 
@@ -791,8 +817,8 @@ def load_generated_noisy_signals(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_
 def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
     print(':: loading TUH abnormal data + white noise')
 
-    data_dir = 'data/tuh_abnormal_data/eval/'
-    # data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
+    # data_dir = 'data/tuh_abnormal_data/eval/'
+    data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
 
     # build data dictionary
     annotations = {}
@@ -846,9 +872,9 @@ def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size
 
 
     # limiters
-    raw_paths = raw_paths[:50]
-    descriptions = descriptions[:50]
-    classification = classification[:50]
+    raw_paths = raw_paths[:20]
+    descriptions = descriptions[:20]
+    classification = classification[:20]
 
     # load data and set annotations
     dataset = []

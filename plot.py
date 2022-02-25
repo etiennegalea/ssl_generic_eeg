@@ -186,7 +186,7 @@ class Plot:
         print('Done')
 
     # Plot learning curves for fully-supervised and self-supervised logistic regression
-    def plot_learning_curves(self, ssl_train_sizes, raw_train_sizes, ssl_train_scores, ssl_test_scores, raw_train_scores, raw_test_scores, dataset_name):
+    def plot_learning_curves_sklearn(self, ssl_train_sizes, raw_train_sizes, ssl_train_scores, ssl_test_scores, raw_train_scores, raw_test_scores, dataset_name):
         # create additional features
         ssl_train_scores_mean, ssl_test_scores_mean = np.mean(ssl_train_scores, axis=1), np.mean(ssl_test_scores, axis=1)
         ssl_train_scores_std, ssl_test_scores_std = np.std(ssl_train_scores, axis=1), np.std(ssl_test_scores, axis=1)
@@ -194,7 +194,7 @@ class Plot:
         raw_train_scores_std, raw_test_scores_std = np.std(raw_train_scores, axis=1), np.std(raw_test_scores, axis=1)
         
 
-        print(':: plotting learning curves... ', end='')
+        print(':: plotting learning curves (sklearn)... ', end='')
         _, ax = plt.subplots(1, 1, figsize=(20, 10))
         ax.grid()
 
@@ -241,4 +241,50 @@ class Plot:
         plt.legend(loc="best")
 
         self._plot(plt, 'logit_learning_curves')
+        print('Done')
+
+
+
+
+    # Plot learning curves for fully-supervised and self-supervised logistic regression
+    def plot_learning_curves(self, ssl_space, raw_space, ssl_train_scores, raw_train_scores, dataset_name):
+
+        # get mean and std dev
+        ssl_train_scores_avg, raw_train_scores_avg = np.mean(ssl_train_scores, axis=1),  np.mean(raw_train_scores, axis=1)
+        ssl_train_scores_std, raw_train_scores_std = np.std(ssl_train_scores, axis=1), np.std(raw_train_scores, axis=1)
+
+        print(':: plotting learning curves... ', end='')
+        _, ax = plt.subplots(1, 1, figsize=(20, 10))
+        ax.grid()
+
+        # insert 0 in the beginning of each linspace
+        ssl_space, raw_space = np.insert(ssl_space, 0, 0), np.insert(raw_space, 0, 0)
+
+        # SSL
+        ax.fill_between(
+            ssl_space,
+            ssl_train_scores_avg - ssl_train_scores_std,
+            ssl_train_scores_avg + ssl_train_scores_std,
+            alpha=0.1,
+            color="g",
+        )
+        # FS
+        ax.fill_between(
+            raw_space,
+            raw_train_scores_avg - raw_train_scores_std,
+            raw_train_scores_avg + raw_train_scores_std,
+            alpha=0.1,
+            color="r",
+        )
+
+        ax.set_xlabel("Training examples")
+        ax.set_ylabel("Accuracy")
+
+        ax.set_title(f'Fully-Supervised and Self-Supervised Logistic Regression scores per Training Example')
+        plt.plot(ssl_space, ssl_train_scores_avg, color='g', label='SSL Training Scores')
+        plt.plot(raw_space, raw_train_scores_avg, color='r', label='Raw Training Scores')
+        plt.legend(loc="best")
+
+        self._plot(plt, 'logit_learning_curves')
+
         print('Done')
