@@ -317,11 +317,11 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
 
 
         raw_space = np.linspace(0.01,1,40)
-        raw_space = np.round(raw_space*len(X)).astype(int)
+        raw_space = np.round(raw_space*len(X_raw)).astype(int)
         # train statified FS logit with CV to obtain learning scores
         raw_train_scores = [np.array([0.0]*cv)]
         for i in raw_space: 
-            _X, _y = X[:i], y[:i]
+            _X, _y = X_raw[:i], y_raw[:i]
             raw_train_scores += [cross_val_score(fs_pipe, _X, _y, cv=cv, scoring='f1_weighted')]
 
         # Fit and score the logistic regression on raw vectors
