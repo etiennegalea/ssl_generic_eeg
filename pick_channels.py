@@ -6,12 +6,14 @@ from tqdm import tqdm
 import pandas as pd
 import pprint
 
+from helper_funcs import HelperFuncs as hf
+
 
 
 pp = pprint.PrettyPrinter(indent=2)
 
 # data_dir = '/media/maligan/My Passport/msc_thesis/ssl_thesis/data/'
-data_dir = '/media/maligan/My Passport/msc_thesis/ssl_thesis/data/tuh_abnormal_data/train/'
+data_dir = '/media/maligan/My Passport/msc_thesis/data/tuar/v2.1.0/edf/01_tcp_ar/'
 
 def get_file_list(x):
     return [os.path.join(x, fname) for fname in os.listdir(x)]
@@ -19,30 +21,27 @@ def get_file_list(x):
 def get_id(x):
     return x.split('/')[-1]
 
-annotations = {}
-for annotation in get_file_list(data_dir):
-    subjects = {}
-    for subject in get_file_list(annotation):
-        recordings = {}
-        for recording in get_file_list(subject):
-            dates = {}
-            for date in get_file_list(recording):
-                for raw_path in get_file_list(date):
-                    if '.edf' in get_id(raw_path):
-                        break
-                    else:
-                        pass
-                dates[get_id(date)] = raw_path
-            recordings[get_id(recording)] = dates
-        subjects[get_id(subject)] = recordings
-    annotations[get_id(annotation)] = subjects
+subjects = {}
+for subject in hf.get_file_list(data_dir):
+    recordings = {}
+    for recording in hf.get_file_list(subject):
+        dates = {}
+        for date in hf.get_file_list(recording):
+            for raw_path in hf.get_file_list(date):
+                if '_2_channels.fif' in hf.get_id(raw_path):
+                    break
+                else:
+                    pass
+            dates[hf.get_id(date)] = raw_path
+        recordings[hf.get_id(recording)] = dates
+    subjects[hf.get_id(subject)] = recordings
 
 
 
-pp.pprint(annotations)
+pp.pprint(subjects)
 
 
-df = pd.json_normalize(annotations, sep='_').T
+df = pd.json_normalize(subjects, sep='_').T
 
 # read, pick channels, save loop
 error = []
