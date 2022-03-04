@@ -49,7 +49,7 @@ from segment import Segmenter
 
 ### Load model
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='tuh_abnormal', help='Dataset for downstream task: \
+@click.option('--dataset_name', '--dataset', '-n', default='space_bambi', help='Dataset for downstream task: \
     "space_bambi", "sleep_staging", "tuh_abnormal", "scopolamine", "white_noise", "bci".')
 @click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
 # @click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
@@ -556,8 +556,8 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
     print(':: loading SPACE/BAMBI data')
 
     # space_bambi directory
-    data_dir = './data/SPACE_BAMBI_2channels/'
-    # data_dir = '/media/maligan/My Passport/msc_thesis/data/SPACE_BAMBI_2channels/'
+    # data_dir = './data/SPACE_BAMBI_rereferenced/'
+    data_dir = '/media/maligan/My Passport/msc_thesis/data/SPACE_BAMBI_rereferenced/'
 
     raws = []
 
@@ -590,7 +590,7 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
 
     # create windows from epochs and descriptions
     ds = BaseConcatDataset([BaseDataset(raws[i], descriptions[i]) for i in range(len(descriptions))])
-    window_size_samples = window_size_s * sfreq
+    
     mapping = {
         'artifact': 0,
         'non-artifact': 1,
