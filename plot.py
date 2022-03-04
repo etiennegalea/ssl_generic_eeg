@@ -199,13 +199,13 @@ class Plot:
         ax.grid()
 
         # fill in std deviation for SSL
-        ax.fill_between(
-            ssl_train_sizes,
-            ssl_train_scores_mean - ssl_train_scores_std,
-            ssl_train_scores_mean + ssl_train_scores_std,
-            alpha=0.1,
-            color="r",
-        )
+        # ax.fill_between(
+        #     ssl_train_sizes,
+        #     ssl_train_scores_mean - ssl_train_scores_std,
+        #     ssl_train_scores_mean + ssl_train_scores_std,
+        #     alpha=0.1,
+        #     color="r",
+        # )
         ax.fill_between(
             ssl_train_sizes,
             ssl_test_scores_mean - ssl_test_scores_std,
@@ -215,13 +215,13 @@ class Plot:
         )
 
         # fill in std deviation for FS
-        ax.fill_between(
-            raw_train_sizes,
-            raw_train_scores_mean - raw_train_scores_std,
-            raw_train_scores_mean + raw_train_scores_std,
-            alpha=0.1,
-            color="g",
-        )
+        # ax.fill_between(
+        #     raw_train_sizes,
+        #     raw_train_scores_mean - raw_train_scores_std,
+        #     raw_train_scores_mean + raw_train_scores_std,
+        #     alpha=0.1,
+        #     color="g",
+        # )
         ax.fill_between(
             raw_train_sizes,
             raw_test_scores_mean - raw_test_scores_std,
@@ -230,14 +230,15 @@ class Plot:
             color="g",
         )
 
+        plt.ylim(0, 1)
         ax.set_xlabel("Training examples")
-        ax.set_ylabel("Score")
+        ax.set_ylabel("Balanced Accuracy")
 
         ax.set_title(f'Fully-Supervised and Self-Supervised Logistic Regression scores per Training Example for {dataset_name} dataset')
-        plt.plot(ssl_train_sizes, ssl_train_scores_mean, color='r', label='SSL Training Score')
-        plt.plot(ssl_train_sizes, ssl_test_scores_mean, '--', color='r', label='SSL Cross-Validation')
-        plt.plot(raw_train_sizes, raw_train_scores_mean, color='g', label='FS Training Score')
-        plt.plot(raw_train_sizes, raw_test_scores_mean, '--', color='g', label='FS Cross-Validation')
+        # plt.plot(ssl_train_sizes, ssl_train_scores_mean, color='r', label='SSL Training Score')
+        plt.plot(ssl_train_sizes, ssl_test_scores_mean, '-', color='r', label='SSL')
+        # plt.plot(raw_train_sizes, raw_train_scores_mean, color='g', label='FS Training Score')
+        plt.plot(raw_train_sizes, raw_test_scores_mean, '-', color='g', label='FS')
         plt.legend(loc="best")
 
         self._plot(plt, 'logit_learning_curves')

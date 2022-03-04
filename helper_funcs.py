@@ -115,3 +115,23 @@ class HelperFuncs():
         raw = raw.set_annotations(mne.Annotations(onset=[0], duration=raw.times.max(), description=[stage]))
 
         return raw
+
+
+    def return_space(X, logspace=False, static_space=[10,100,1000], raw=False):
+        '''
+        X: data
+        logspace: use np.logspace
+        static_space: static examples to start with
+        raw: multiply the number of examples (for raw windows (number of channels))
+        '''
+
+        n_batches = 17 if raw else 7
+        
+        static_space = np.array(static_space)
+        ssl_log_space = np.logspace(0.0001,1,n_batches)/10 if logspace else np.linspace(0.0001, 1, n_batches)
+        ssl_space = (ssl_log_space*len(X)).astype(int)
+
+        space = np.concatenate([static_space, ssl_space])
+
+
+        return space

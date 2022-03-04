@@ -49,7 +49,7 @@ from segment import Segmenter
 
 ### Load model
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='sleep_staging', help='Dataset for downstream task: \
+@click.option('--dataset_name', '--dataset', '-n', default='tuh_abnormal', help='Dataset for downstream task: \
     "space_bambi", "sleep_staging", "tuh_abnormal", "scopolamine", "white_noise", "bci".')
 @click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
 # @click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
@@ -94,6 +94,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         print(f":: loading the latest pretrained model: {latest}")
         model = torch.load(f"{model_dir}{latest}.model")
     else:
+        # model = torch.load("models/pretrained/2022_02_08__16_16_sleep_staging_2s_windows_83_subjects_cpu_25_epochs_100hz.model")
         model = torch.load("models/pretrained/2021_12_16__10_23_49_sleep_staging_5s_windows_83_subjects_cpu_15_epochs_100hz.model")
         # model = torch.load("models/pretrained/2022_01_31__12_02_47_sleep_staging_5s_windows_5_subjects_cpu_15_epochs_100hz.model")
 
@@ -122,7 +123,17 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             annotations = ['abnormal', 'normal', 'white_noise']
         elif dataset_name == 'tuar':
             windows_dataset = load_tuar_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
-            annotations = ['eyem', 'chew', 'shiv', 'musc', 'elec']
+            # annotations = ['eyem', 'chew', 'shiv', 'musc', 'elec']
+            # annotations = [
+                # 'null', 'spsw', 'gped', 'pled', 'eyeb', 'artf','bckg', 'seiz', 'fnsz', 'gnsz', 'spsz', 'cpsz','absz',
+                # 'tnsz', 'cnsz', 'tcsz', 'atsz', 'mysz','nesz', 'intr', 'slow', 'eyem', 'chew', 'shiv','musc', 'elpp', 
+                # 'elst', 'calb', 'hphs', 'trip','elec', 'eyem_chew', 'eyem_shiv', 'eyem_musc', 'eyem_elec', 'chew_shiv', 
+                # 'chew_musc', 'chew_elec', 'shiv_musc', 'shiv_elec', 'musc_elec']
+            annotations = [
+                'bckg', 'chew', 'chew_elec', 'chew_musc', 'elec', 'eyem',
+                'eyem_chew', 'eyem_elec', 'eyem_musc', 'eyem_shiv', 'musc',
+                'musc_elec', 'shiv'
+            ]
 
 
         # print all parameter vars
@@ -187,28 +198,28 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         # Initialize the logistic regression model
         log_reg = LogisticRegression(
             penalty='l2', C=1.0, class_weight='balanced', solver='newton-cg',
-            multi_class='multinomial', random_state=random_state, max_iter=1000, tol=0.01, warm_start=True)
+            multi_class='multinomial', random_state=random_state, max_iter=1000, tol=0.01)
         clf_pipe = make_pipeline(StandardScaler(), log_reg)
 
         # estimate learning curve specifications
-        # ssl_train_sizes, ssl_train_scores, ssl_test_scores = learning_curve(
-        #     clf_pipe,
-        #     X=X,
-        #     y=y,
-        #     cv=5,
-        #     scoring='balanced_accuracy',
-        #     n_jobs=-1,
-        #     train_sizes = np.linspace(0.00001,1,20),
-        #     shuffle=True
-        # )
+        ssl_train_sizes, ssl_train_scores, ssl_test_scores = learning_curve(
+            clf_pipe,
+            X=X,
+            y=y,
+            cv=5,
+            scoring='balanced_accuracy',
+            n_jobs=-1,
+            train_sizes = np.linspace(0.00001,1,20),
+            shuffle=True
+        )
 
-        ssl_space = np.linspace(0.0001,1,20)
-        ssl_space = np.ceil(ssl_space*len(X)).astype(int)
-        # train statified SSL logit with CV to obtain learning scores
-        ssl_train_scores = [np.array([0.0]*cv)]
-        for i in ssl_space: 
-            _X, _y = X[:i], y[:i]
-            ssl_train_scores += [cross_val_score(clf_pipe, _X, _y, cv=cv, scoring='balanced_accuracy')]
+        # ssl_space = np.linspace(0.0001,1,20)
+        # ssl_space = np.ceil(ssl_space*len(X)).astype(int)
+        # # train statified SSL logit with CV to obtain learning scores
+        # ssl_train_scores = [np.array([0.0]*cv)]
+        # for i in ssl_space: 
+        #     _X, _y = X[:i], y[:i]
+        #     ssl_train_scores += [cross_val_score(clf_pipe, _X, _y, cv=cv, scoring='balanced_accuracy')]
 
         # Fit and score the logistic regression
         clf_pipe.fit(*data['train'])
@@ -301,28 +312,28 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         # re-init logistic regression
         log_reg = LogisticRegression(
             penalty='l2', C=1.0, class_weight='balanced', solver='newton-cg',
-            multi_class='multinomial', random_state=random_state, max_iter=1000, tol=0.01, warm_start=True)
+            multi_class='multinomial', random_state=random_state, max_iter=1000, tol=0.01)
         fs_pipe = make_pipeline(StandardScaler(), log_reg)
 
-        # raw_train_sizes, raw_train_scores, raw_test_scores = learning_curve(
-        #     fs_pipe,
-        #     X=X_raw,
-        #     y=y_raw,
-        #     cv=5,
-        #     scoring='balanced_accuracy',
-        #     n_jobs=-1,
-        #     train_sizes = np.linspace(0.00001,1,40),
-        #     shuffle=True
-        # )
+        raw_train_sizes, raw_train_scores, raw_test_scores = learning_curve(
+            fs_pipe,
+            X=X_raw,
+            y=y_raw,
+            cv=5,
+            scoring='balanced_accuracy',
+            n_jobs=-1,
+            train_sizes = np.linspace(0.00001,1,40),
+            shuffle=True
+        )
 
 
-        raw_space = np.linspace(0.0001,1,40)
-        raw_space = np.ceil(raw_space*len(X_raw)).astype(int)
-        # train statified FS logit with CV to obtain learning scores
-        raw_train_scores = [np.array([0.0]*cv)]
-        for i in raw_space: 
-            _X, _y = X_raw[:i], y_raw[:i]
-            raw_train_scores += [cross_val_score(fs_pipe, _X, _y, cv=cv, scoring='balanced_accuracy')]
+        # raw_space = np.linspace(0.0001,1,40)
+        # raw_space = np.ceil(raw_space*len(X_raw)).astype(int)
+        # # train statified FS logit with CV to obtain learning scores
+        # raw_train_scores = [np.array([0.0]*cv)]
+        # for i in raw_space: 
+        #     _X, _y = X_raw[:i], y_raw[:i]
+        #     raw_train_scores += [cross_val_score(fs_pipe, _X, _y, cv=cv, scoring='balanced_accuracy')]
 
         # Fit and score the logistic regression on raw vectors
         fs_pipe.fit(*raw_data['train'])
@@ -356,25 +367,25 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             f.write(pprint.pformat(class_report, indent=4, sort_dicts=False))
 
         # plotting learning curves
-        # p.plot_learning_curves_sklearn(
-        #     ssl_train_sizes,
-        #     raw_train_sizes,
-        #     ssl_train_scores=ssl_train_scores, 
-        #     ssl_test_scores=ssl_test_scores, 
-        #     raw_train_scores=raw_train_scores, 
-        #     raw_test_scores=raw_test_scores, 
-        #     dataset_name=dataset_name
-        # )
+        p.plot_learning_curves_sklearn(
+            ssl_train_sizes,
+            raw_train_sizes,
+            ssl_train_scores=ssl_train_scores, 
+            ssl_test_scores=ssl_test_scores, 
+            raw_train_scores=raw_train_scores, 
+            raw_test_scores=raw_test_scores, 
+            dataset_name=dataset_name
+        )
 
 
         # plotting learning curves
-        p.plot_learning_curves(
-            ssl_space,
-            raw_space,
-            ssl_train_scores=ssl_train_scores,
-            raw_train_scores=raw_train_scores, 
-            dataset_name=dataset_name
-        )
+        # p.plot_learning_curves(
+        #     ssl_space,
+        #     raw_space,
+        #     ssl_train_scores=ssl_train_scores,
+        #     raw_train_scores=raw_train_scores, 
+        #     dataset_name=dataset_name
+        # )
 
 
 # ---------------------------------- PROCESSING FUNCTIONS ----------------------------------
@@ -403,7 +414,7 @@ def create_windows_dataset(raws, window_size_samples, descriptions=None, mapping
         window_size_samples=window_size_samples,
         window_stride_samples=window_size_samples,
         drop_last_window=True,
-        accepted_bads_ratio=0.0,
+        accepted_bads_ratio=0.2,
         drop_bad_windows=True,
         on_missing='ignore',
         descriptions=descriptions,
@@ -707,8 +718,8 @@ def load_scopolamine_test_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_si
 def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
     print(':: loading TUH abnormal data')
 
-    data_dir = 'data/tuh_abnormal_data/eval/'
-    # data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
+    # data_dir = 'data/tuh_abnormal_data/eval/'
+    data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
 
     # build data dictionary
     annotations = {}
@@ -760,9 +771,9 @@ def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sampl
     raw_paths, descriptions, classification = shuffle(raw_paths, descriptions, classification)
 
     # limiters
-    raw_paths = raw_paths[:50]
-    descriptions = descriptions[:50]
-    classification = classification[:50]
+    raw_paths = raw_paths[:20]
+    descriptions = descriptions[:20]
+    classification = classification[:20]
 
     # load data and set annotations
     dataset = []
@@ -915,79 +926,36 @@ def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size
 def load_tuar_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
     print(':: loading TUAR data')
 
-    # data_dir = 'data/tuar/v2.1.0/edf/01_tcp_ar/'
-    data_dir = '/media/maligan/My Passport/msc_thesis/data/tuar/v2.1.0/edf/01_tcp_ar/'
+    dir_path = '/media/maligan/My Passport/msc_thesis/data/tuar/v2_1_0/processed/'
 
-    # build data dictionary
-    subjects = {}
-    for subject in hf.get_file_list(data_dir):
-        recordings = {}
-        for recording in hf.get_file_list(subject):
-            dates = {}
-            for date in hf.get_file_list(recording):
-                for raw_path in hf.get_file_list(date):
-                    if '_2_channels.fif' in hf.get_id(raw_path):
-                        break
-                    else:
-                        pass
-                dates[hf.get_id(date)] = raw_path
-            recordings[hf.get_id(recording)] = dates
-        subjects[hf.get_id(subject)] = recordings
-    
-
-    df = pd.json_normalize(subjects, sep='_').T
-
-    # paths list
-    raw_paths = [df.iloc[i][0] for i in range(len(df))]
-
-    # define abnormal and normal subjects
-    
-    abnormal_subjects = subjects['abnormal'].keys()
-    normal_subjects = subjects['normal'].keys()
-
-    # define descriptions (recoding per subject)
-    abnormal_descriptions, normal_descriptions, classification = [], [], []
-    for id in abnormal_subjects:
-        for recording in subjects['abnormal'][id].values():
-            for x in recording.keys():
-                abnormal_descriptions += [{'subject': int(id), 'recording': x}]
-                classification += ['abnormal']
-    for id in normal_subjects:
-        for recording in subjects['normal'][id].values():
-            for x in recording.keys():
-                normal_descriptions += [{'subject': int(id), 'recording': x}]
-                classification += ['normal']
-
-    descriptions = abnormal_descriptions + normal_descriptions
-
-    # shuffle raw_paths and descriptions
-    from sklearn.utils import shuffle
-    raw_paths, descriptions, classification = shuffle(raw_paths, descriptions, classification)
-
-    # limiters
-    raw_paths = raw_paths[:50]
-    descriptions = descriptions[:50]
-    classification = classification[:50]
-
-    # load data and set annotations
+    files = hf.get_file_list(dir_path)[1:10]
     dataset = []
-    for i, path in enumerate(raw_paths):
-        _class = classification[i]
-        raw = mne.io.read_raw_fif(path, preload=True)
-        raw = raw.set_annotations(mne.Annotations(onset=[0], duration=raw.times.max(), description=[_class]))
-        dataset.append(raw)
+    descriptions = []
 
-    pp = pprint.PrettyPrinter(indent=2)
-    pp.pprint(raw_paths)
-    pp.pprint(dataset)
+    for i, f in enumerate(files):
+        dataset += [mne.io.read_raw_fif(f)]
+        descriptions += [{'subject': i}]
 
     # preprocess dataset
     dataset = preprocess_raws(dataset, sfreq, low_cut_hz, high_cut_hz, n_jobs)
 
+    # annotation map
     mapping = {
-        'abnormal': 0,
-        'normal': 1
+        'null': 0, 'spsw': 1, 'gped': 2, 'pled': 3, 'eyeb': 4, 'artf': 5,
+        'bckg': 6, 'seiz': 7, 'fnsz': 8, 'gnsz': 9, 'spsz': 10, 'cpsz': 11,
+        'absz': 12, 'tnsz': 13, 'cnsz': 14, 'tcsz': 15, 'atsz': 16, 'mysz': 17,
+        'nesz': 18, 'intr': 19, 'slow': 20, 'eyem': 21, 'chew': 22, 'shiv': 23,
+        'musc': 24, 'elpp': 25, 'elst': 26, 'calb': 27, 'hphs': 28, 'trip': 29,
+        'elec': 30, 'eyem_chew': 100, 'eyem_shiv': 101, 'eyem_musc': 102, 'eyem_elec': 103, 
+        'chew_shiv': 104, 'chew_musc': 105, 'chew_elec': 106, 'shiv_musc': 107, 'shiv_elec': 108,
+        'musc_elec': 109
     }
+
+    # mapping = {
+    #     'bckg': 0, 'chew': 1, 'chew_elec': 2, 'chew_musc': 3, 'elec': 4, 'eyem': 5,
+    #     'eyem_chew': 6, 'eyem_elec': 7, 'eyem_musc': 8, 'eyem_shiv': 9, 'musc': 10,
+    #     'musc_elec': 11, 'shiv': 12
+    # }
 
     # create windows
     windows_dataset = create_windows_dataset(dataset, window_size_samples, descriptions, mapping)
