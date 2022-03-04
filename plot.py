@@ -230,7 +230,7 @@ class Plot:
             color="g",
         )
 
-        plt.ylim(0, 1)
+        # plt.ylim(0, 1)
         ax.set_xlabel("Training examples")
         ax.set_ylabel("Balanced Accuracy")
 
