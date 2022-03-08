@@ -12,7 +12,7 @@ class HelperFuncs():
         pass
         
     # print dataset lengths to match dimensions
-    def print_dataset_lengths(datasets):
+    def print_dataset_lengths(self, datasets):
         for data in datasets:
             print(type(data))
             try:
@@ -23,7 +23,7 @@ class HelperFuncs():
                 print("------------------------------------------------------------------")
 
     # compare torch models (skeletons or trained)
-    def compare_models(model_1, model_2):
+    def compare_models(self, model_1, model_2):
         models_differ = 0
         for key_item_1, key_item_2 in zip(model_1.state_dict().items(), model_2.state_dict().items()):
             if torch.equal(key_item_1[1], key_item_2[1]):
@@ -38,7 +38,7 @@ class HelperFuncs():
             print('Models match perfectly! :)')
 
     # get date, time, or both
-    def get_datetime(dateonly=False):
+    def get_datetime(self, dateonly=False):
         dt = datetime.now()
         return dt.strftime("%Y_%m_%d") if dateonly else dt.strftime("%Y_%m_%d__%H_%M")
 
@@ -56,9 +56,9 @@ class HelperFuncs():
 
     
     # helper functions for loading TUH abnormal raw files from hierarchy
-    def get_file_list(x):
+    def get_file_list(self, x):
         return [os.path.join(x, fname) for fname in os.listdir(x)]
-    def get_id(x):
+    def get_id(self, x):
         return x.split('/')[-1]
 
     # check for existing folder/s and create them if directory does not exist
@@ -67,6 +67,7 @@ class HelperFuncs():
 
     # generate simulated noisy signals (sinusoidal waves w/ noise)
     def generate_noisy_raws(
+        self,
         ch_names=['SIM0001', 'SIM0002'],
         ch_types=['eeg']*2,
         sfreq=100.0,
@@ -95,6 +96,7 @@ class HelperFuncs():
 
     # generate simulated white noise signals
     def generate_white_noise_raws(
+        self,
         ch_names=['SIM0001', 'SIM0002'],
         ch_types=['eeg']*2,
         sfreq=100.0,
@@ -117,7 +119,7 @@ class HelperFuncs():
         return raw
 
 
-    def return_space(X, logspace=False, static_space=[10,100,1000], raw=False):
+    def return_space(self, X, logspace=False, static_space=[10,100,1000], raw=False):
         '''
         X: data
         logspace: use np.logspace
@@ -135,3 +137,13 @@ class HelperFuncs():
 
 
         return space
+
+    # check factor of 10 for space
+    def check_factor_loop(self, n, arr, factor):
+        if factor < n:  arr += [self.check_factor_loop(n, arr, factor*10)]
+        else:           return n
+        return factor
+    def factored_space(self, n):
+        arr = []
+        arr += [self.check_factor_loop(n, arr, factor=10)]
+        return arr[::-1]

@@ -51,12 +51,13 @@ from matplotlib import cm
 
 
 # classes
-from helper_funcs import HelperFuncs as hf
+from helper_funcs import HelperFuncs
 from ContrastiveNet import *
 from RelativePositioningDataset import *
 from plot import Plot
 from segment import Segmenter
 
+hf = HelperFuncs()
 
 # ----
 

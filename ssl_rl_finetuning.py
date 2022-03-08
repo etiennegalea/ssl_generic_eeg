@@ -35,11 +35,13 @@ from  mat73 import loadmat
 import matplotlib.pyplot as plt
 
 # classes
-from helper_funcs import HelperFuncs as hf
+from helper_funcs import HelperFuncs
 from ContrastiveNet import *
 from RelativePositioningDataset import *
 from plot import Plot
 from segment import Segmenter
+
+hf = HelperFuncs()
 
 
 # Authors: Hubert Banville <hubert.jbanville@gmail.com>
@@ -49,7 +51,7 @@ from segment import Segmenter
 
 ### Load model
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='space_bambi', help='Dataset for downstream task: \
+@click.option('--dataset_name', '--dataset', '-n', default='tuh_abnormal', help='Dataset for downstream task: \
     "space_bambi", "sleep_staging", "tuh_abnormal", "scopolamine", "white_noise", "bci".')
 @click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
 # @click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
@@ -201,15 +203,18 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             multi_class='multinomial', random_state=random_state, max_iter=1000, tol=0.01)
         clf_pipe = make_pipeline(StandardScaler(), log_reg)
 
+        scoring = 'balanced_accuracy'
+
         # estimate learning curve specifications
         ssl_train_sizes, ssl_train_scores, ssl_test_scores = learning_curve(
             clf_pipe,
             X=X,
             y=y,
             cv=5,
-            scoring='balanced_accuracy',
+            scoring=scoring,
             n_jobs=-1,
-            train_sizes = np.linspace(0.00001,1,20),
+            # train_sizes = np.linspace(0.00001,1,20),
+            train_sizes = hf.factored_space(X),
             shuffle=True
         )
 
@@ -219,7 +224,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         # ssl_train_scores = [np.array([0.0]*cv)]
         # for i in ssl_space: 
         #     _X, _y = X[:i], y[:i]
-        #     ssl_train_scores += [cross_val_score(clf_pipe, _X, _y, cv=cv, scoring='balanced_accuracy')]
+        #     ssl_train_scores += [cross_val_score(clf_pipe, _X, _y, cv=cv, scoring=scoring)]
 
         # Fit and score the logistic regression
         clf_pipe.fit(*data['train'])
@@ -320,9 +325,10 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             X=X_raw,
             y=y_raw,
             cv=5,
-            scoring='balanced_accuracy',
+            scoring=scoring,
             n_jobs=-1,
-            train_sizes = np.linspace(0.00001,1,40),
+            # train_sizes = np.linspace(0.00001,1,40),
+            train_sizes = hf.factored_space(X_raw),
             shuffle=True
         )
 
@@ -333,7 +339,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         # raw_train_scores = [np.array([0.0]*cv)]
         # for i in raw_space: 
         #     _X, _y = X_raw[:i], y_raw[:i]
-        #     raw_train_scores += [cross_val_score(fs_pipe, _X, _y, cv=cv, scoring='balanced_accuracy')]
+        #     raw_train_scores += [cross_val_score(fs_pipe, _X, _y, cv=cv, scoring=scoring)]
 
         # Fit and score the logistic regression on raw vectors
         fs_pipe.fit(*raw_data['train'])
@@ -564,8 +570,8 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
     print(f'{len(os.listdir(data_dir))} files found')
     for i, path in enumerate(os.listdir(data_dir)):
         # limiter
-        # if i == 5:
-        #    break
+        if i == 25:
+           break
             
         full_path = os.path.join(data_dir, path)
         raw = mne.io.read_raw_fif(full_path)
@@ -590,7 +596,7 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
 
     # create windows from epochs and descriptions
     ds = BaseConcatDataset([BaseDataset(raws[i], descriptions[i]) for i in range(len(descriptions))])
-    
+
     mapping = {
         'artifact': 0,
         'non-artifact': 1,
