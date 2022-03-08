@@ -214,7 +214,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             scoring=scoring,
             n_jobs=-1,
             # train_sizes = np.linspace(0.00001,1,20),
-            train_sizes = hf.factored_space(X),
+            train_sizes = factored_space(X),
             shuffle=True
         )
 
@@ -328,7 +328,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             scoring=scoring,
             n_jobs=-1,
             # train_sizes = np.linspace(0.00001,1,40),
-            train_sizes = hf.factored_space(X_raw),
+            train_sizes = factored_space(X_raw),
             shuffle=True
         )
 
@@ -434,6 +434,21 @@ def create_windows_dataset(raws, window_size_samples, descriptions=None, mapping
     return windows_dataset
 
 
+# ---------------------------------- MISC FUNS ----------------------------------
+
+
+# check factor of 10 for space
+def check_factor_loop(self, n, arr, factor):
+    if factor < n:
+        arr += [self.check_factor_loop(n, arr, factor*10)]
+    else:
+        return n
+    return factor
+    
+def factored_space(self, n):
+    arr = []
+    arr += [self.check_factor_loop(n, arr, factor=10)]
+    return arr[::-1]
         
 # ---------------------------------- LOADING DATASETS ----------------------------------
 

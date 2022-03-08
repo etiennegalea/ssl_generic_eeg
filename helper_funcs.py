@@ -140,9 +140,12 @@ class HelperFuncs():
 
     # check factor of 10 for space
     def check_factor_loop(self, n, arr, factor):
-        if factor < n:  arr += [self.check_factor_loop(n, arr, factor*10)]
-        else:           return n
+        if factor < n:
+            arr += [self.check_factor_loop(n, arr, factor*10)]
+        else:
+            return n
         return factor
+        
     def factored_space(self, n):
         arr = []
         arr += [self.check_factor_loop(n, arr, factor=10)]
