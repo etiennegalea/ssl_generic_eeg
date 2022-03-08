@@ -50,7 +50,7 @@ from segment import Segmenter
 
 ### Load model
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='sleep_staging', help='Dataset for downstream task: \
+@click.option('--dataset_name', '--dataset', '-n', default='tuar', help='Dataset for downstream task: \
     "space_bambi", "sleep_staging", "tuh_abnormal", "scopolamine", "white_noise", "bci".')
 @click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
 # @click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
@@ -130,11 +130,12 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
                 # 'tnsz', 'cnsz', 'tcsz', 'atsz', 'mysz','nesz', 'intr', 'slow', 'eyem', 'chew', 'shiv','musc', 'elpp', 
                 # 'elst', 'calb', 'hphs', 'trip','elec', 'eyem_chew', 'eyem_shiv', 'eyem_musc', 'eyem_elec', 'chew_shiv', 
                 # 'chew_musc', 'chew_elec', 'shiv_musc', 'shiv_elec', 'musc_elec']
-            annotations = [
-                'bckg', 'chew', 'chew_elec', 'chew_musc', 'elec', 'eyem',
-                'eyem_chew', 'eyem_elec', 'eyem_musc', 'eyem_shiv', 'musc',
-                'musc_elec', 'shiv'
-            ]
+            # annotations = [
+            #     'bckg', 'chew', 'chew_elec', 'chew_musc', 'elec', 'eyem',
+            #     'eyem_chew', 'eyem_elec', 'eyem_musc', 'eyem_shiv', 'musc',
+            #     'musc_elec', 'shiv'
+            # ]
+            annotations = ['artifact', 'non-artifact', 'ignored']
 
 
         # print all parameter vars
@@ -683,6 +684,9 @@ def load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sa
     # create windows
     windows_dataset = create_windows_dataset(dataset, window_size_samples, descriptions, mapping)
 
+    # channel-wise zscore normalization
+    preprocess(windows_dataset, [Preprocessor(zscore)])
+    
     return windows_dataset
 
 
@@ -718,6 +722,9 @@ def load_scopolamine_test_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_si
 
     # create windows
     windows_dataset = create_windows_dataset(dataset, window_size_samples, descriptions, mapping)
+
+    # channel-wise zscore normalization
+    preprocess(windows_dataset, [Preprocessor(zscore)])
 
     return windows_dataset
 
@@ -805,6 +812,9 @@ def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sampl
     # create windows
     windows_dataset = create_windows_dataset(dataset, window_size_samples, descriptions, mapping)
 
+    # channel-wise zscore normalization
+    preprocess(windows_dataset, [Preprocessor(zscore)])
+
     return windows_dataset
 
 
@@ -828,6 +838,9 @@ def load_generated_noisy_signals(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_
 
     # create windows
     windows_dataset = create_windows_dataset(dataset, window_size_samples, descriptions, mapping)
+
+    # channel-wise zscore normalization
+    preprocess(windows_dataset, [Preprocessor(zscore)])
 
     return windows_dataset
 
@@ -930,42 +943,73 @@ def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size
     return windows_dataset
 
 
-def load_tuar_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
+def load_tuar_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s):
     print(':: loading TUAR data')
 
-    dir_path = '/media/maligan/My Passport/msc_thesis/data/tuar/v2_1_0/processed/'
+    data_dir = '/media/maligan/My Passport/msc_thesis/data/tuar/v2_1_0/processed/'
+    raws = []
 
-    files = hf.get_file_list(dir_path)[1:10]
-    dataset = []
-    descriptions = []
+    print(f'{len(os.listdir(data_dir))} files found')
+    for i, path in enumerate(os.listdir(data_dir)):
+        # limiter
+        if i == 5:
+           break
+            
+        full_path = os.path.join(data_dir, path)
+        raw = mne.io.read_raw_fif(full_path)
+        raws.append(raw)
 
-    for i, f in enumerate(files):
-        dataset += [mne.io.read_raw_fif(f)]
-        descriptions += [{'subject': i}]
 
     # preprocess dataset
-    dataset = preprocess_raws(dataset, sfreq, low_cut_hz, high_cut_hz, n_jobs)
+    dataset = preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs)
+    event_mapping = {0: 'artifact', 1: 'non-artifact', 2:'ignore'}
 
-    # annotation map
+    # segment dataset recordings into windows and add descriptions
+    raws, descriptions = [], []
+    segmenter = Segmenter(window_size=window_size_s, window_overlap=0.5, cutoff_length=0.1)
+    for subject_id, raw in enumerate(dataset):
+        x = segmenter.segment(raw)
+        annot_from_events = mne.annotations_from_events(events=x.events, event_desc=event_mapping, sfreq=x.info['sfreq'])
+        duration_per_event = [x.times[-1]+x.times[1]]
+        annot_from_events.duration = np.array(duration_per_event * len(x.events))
+        raws += [raw.set_annotations(annot_from_events)]
+        descriptions += [{"subject": int(subject_id), "recording": raw}]
+    
+
+    # create windows from epochs and descriptions
+    ds = BaseConcatDataset([BaseDataset(raws[i], descriptions[i]) for i in range(len(descriptions))])
+
     mapping = {
-        'null': 0, 'spsw': 1, 'gped': 2, 'pled': 3, 'eyeb': 4, 'artf': 5,
-        'bckg': 6, 'seiz': 7, 'fnsz': 8, 'gnsz': 9, 'spsz': 10, 'cpsz': 11,
-        'absz': 12, 'tnsz': 13, 'cnsz': 14, 'tcsz': 15, 'atsz': 16, 'mysz': 17,
-        'nesz': 18, 'intr': 19, 'slow': 20, 'eyem': 21, 'chew': 22, 'shiv': 23,
-        'musc': 24, 'elpp': 25, 'elst': 26, 'calb': 27, 'hphs': 28, 'trip': 29,
-        'elec': 30, 'eyem_chew': 100, 'eyem_shiv': 101, 'eyem_musc': 102, 'eyem_elec': 103, 
-        'chew_shiv': 104, 'chew_musc': 105, 'chew_elec': 106, 'shiv_musc': 107, 'shiv_elec': 108,
-        'musc_elec': 109
+        'artifact': 0,
+        'non-artifact': 1,
+        'ignore': 2
     }
 
+    windows_dataset = create_windows_from_events(
+        ds, 
+        mapping = mapping,
+    )
+
+    # channel-wise zscore normalization
+    preprocess(windows_dataset, [Preprocessor(zscore)])
+
+    # # annotation map
     # mapping = {
-    #     'bckg': 0, 'chew': 1, 'chew_elec': 2, 'chew_musc': 3, 'elec': 4, 'eyem': 5,
-    #     'eyem_chew': 6, 'eyem_elec': 7, 'eyem_musc': 8, 'eyem_shiv': 9, 'musc': 10,
-    #     'musc_elec': 11, 'shiv': 12
+    #     'null': 0, 'spsw': 1, 'gped': 2, 'pled': 3, 'eyeb': 4, 'artf': 5,
+    #     'bckg': 6, 'seiz': 7, 'fnsz': 8, 'gnsz': 9, 'spsz': 10, 'cpsz': 11,
+    #     'absz': 12, 'tnsz': 13, 'cnsz': 14, 'tcsz': 15, 'atsz': 16, 'mysz': 17,
+    #     'nesz': 18, 'intr': 19, 'slow': 20, 'eyem': 21, 'chew': 22, 'shiv': 23,
+    #     'musc': 24, 'elpp': 25, 'elst': 26, 'calb': 27, 'hphs': 28, 'trip': 29,
+    #     'elec': 30, 'eyem_chew': 100, 'eyem_shiv': 101, 'eyem_musc': 102, 'eyem_elec': 103, 
+    #     'chew_shiv': 104, 'chew_musc': 105, 'chew_elec': 106, 'shiv_musc': 107, 'shiv_elec': 108,
+    #     'musc_elec': 109
     # }
 
-    # create windows
-    windows_dataset = create_windows_dataset(dataset, window_size_samples, descriptions, mapping)
+    # # mapping = {
+    # #     'bckg': 0, 'chew': 1, 'chew_elec': 2, 'chew_musc': 3, 'elec': 4, 'eyem': 5,
+    # #     'eyem_chew': 6, 'eyem_elec': 7, 'eyem_musc': 8, 'eyem_shiv': 9, 'musc': 10,
+    # #     'musc_elec': 11, 'shiv': 12
+    # # }
 
     return windows_dataset
 
