@@ -946,7 +946,8 @@ def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size
 def load_tuar_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s):
     print(':: loading TUAR data')
 
-    data_dir = '/media/maligan/My Passport/msc_thesis/data/tuar/v2_1_0/processed/'
+    data_dir = 'data/tuar/v2_1_0/processed/'
+    # data_dir = '/media/maligan/My Passport/msc_thesis/data/tuar/v2_1_0/processed/'
     raws = []
 
     print(f'{len(os.listdir(data_dir))} files found')
