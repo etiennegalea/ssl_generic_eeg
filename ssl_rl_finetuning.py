@@ -51,7 +51,7 @@ from segment_tuar import Segmenter_TUAR
 
 ### Load model
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='tuar', help='Dataset for downstream task: \
+@click.option('--dataset_name', '--dataset', '-n', default='bci', help='Dataset for downstream task: \
     "space_bambi", "sleep_staging", "tuh_abnormal", "scopolamine", "white_noise", "bci".')
 @click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
 # @click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
@@ -470,7 +470,7 @@ def load_bci_data(subject_size, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_s
     '''
     print(subject_size)
     print(type(subject_size))
-    subjects = range(subject_size[0], subject_size[1]) # max 110
+    subjects = range(50) # max 110
     event_codes = [
         1, 2,       # eyes open, eyes closed (baselines)
         3, 7, 11,   # Motor execution: left vs right hand
@@ -565,8 +565,8 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
     print(':: loading SPACE/BAMBI data')
 
     # space_bambi directory
-    # data_dir = './data/SPACE_BAMBI_rereferenced/'
-    data_dir = '/media/maligan/My Passport/msc_thesis/data/SPACE_BAMBI_rereferenced/'
+    data_dir = './data/SPACE_BAMBI_rereferenced/'
+    # data_dir = '/media/maligan/My Passport/msc_thesis/data/SPACE_BAMBI_rereferenced/'
 
     raws = []
 
@@ -733,8 +733,8 @@ def load_scopolamine_test_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_si
 def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
     print(':: loading TUH abnormal data')
 
-    # data_dir = 'data/tuh_abnormal_data/eval/'
-    data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
+    data_dir = 'data/tuh_abnormal_data/eval/'
+    # data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
 
     # build data dictionary
     annotations = {}
@@ -849,8 +849,8 @@ def load_generated_noisy_signals(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_
 def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
     print(':: loading TUH abnormal data + white noise')
 
-    # data_dir = 'data/tuh_abnormal_data/eval/'
-    data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
+    data_dir = 'data/tuh_abnormal_data/eval/'
+    # data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
 
     # build data dictionary
     annotations = {}
@@ -947,8 +947,8 @@ def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size
 def load_tuar_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s):
     print(':: loading TUAR data')
 
-    # data_dir = 'data/tuar/v2_1_0/processed/'
-    data_dir = '/media/maligan/My Passport/msc_thesis/data/tuar/v2_1_0/processed/'
+    data_dir = 'data/tuar/v2_1_0/processed/'
+    # data_dir = '/media/maligan/My Passport/msc_thesis/data/tuar/v2_1_0/processed/'
     raws = []
 
     print(f'{len(os.listdir(data_dir))} files found')
