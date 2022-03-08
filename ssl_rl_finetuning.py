@@ -35,13 +35,12 @@ from  mat73 import loadmat
 import matplotlib.pyplot as plt
 
 # classes
-from helper_funcs import HelperFuncs
+from helper_funcs import HelperFuncs as hf
 from ContrastiveNet import *
 from RelativePositioningDataset import *
 from plot import Plot
 from segment import Segmenter
 
-hf = HelperFuncs()
 
 
 # Authors: Hubert Banville <hubert.jbanville@gmail.com>
@@ -204,17 +203,19 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         clf_pipe = make_pipeline(StandardScaler(), log_reg)
 
         scoring = 'balanced_accuracy'
+        cv_train_size = int(np.floor(len(X)/cv * (cv-1)))
+
 
         # estimate learning curve specifications
         ssl_train_sizes, ssl_train_scores, ssl_test_scores = learning_curve(
             clf_pipe,
             X=X,
             y=y,
-            cv=5,
+            cv=cv,
             scoring=scoring,
             n_jobs=-1,
             # train_sizes = np.linspace(0.00001,1,20),
-            train_sizes = factored_space(X),
+            train_sizes = hf.factored_space(cv_train_size),
             shuffle=True
         )
 
@@ -320,15 +321,17 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             multi_class='multinomial', random_state=random_state, max_iter=1000, tol=0.01)
         fs_pipe = make_pipeline(StandardScaler(), log_reg)
 
+        cv_train_size = int(np.floor(len(X_raw)/cv * (cv-1)))
+
         raw_train_sizes, raw_train_scores, raw_test_scores = learning_curve(
             fs_pipe,
             X=X_raw,
             y=y_raw,
-            cv=5,
+            cv=cv,
             scoring=scoring,
             n_jobs=-1,
             # train_sizes = np.linspace(0.00001,1,40),
-            train_sizes = factored_space(X_raw),
+            train_sizes = hf.factored_space(cv_train_size),
             shuffle=True
         )
 
@@ -432,21 +435,6 @@ def create_windows_dataset(raws, window_size_samples, descriptions=None, mapping
     preprocess(windows_dataset, [Preprocessor(zscore)])
 
     return windows_dataset
-
-
-# ---------------------------------- MISC FUNS ----------------------------------
-
-
-# check factor of 10 for space
-def factored_space(n):
-    arr = []
-    factor = 1
-    while factor < n:
-        arr += [factor]
-        factor = factor*10
-    arr += [n]
-
-    return arr
 
 # ---------------------------------- LOADING DATASETS ----------------------------------
 
