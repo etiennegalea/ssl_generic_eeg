@@ -971,13 +971,13 @@ def load_tuar_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s):
 
 
     # preprocess dataset
-    # dataset = preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs)
+    dataset = preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs)
     event_mapping = {0: 'artifact', 1: 'non-artifact', 2:'ignore'}
 
     # segment dataset recordings into windows and add descriptions
     raws, descriptions = [], []
     segmenter = Segmenter_TUAR(window_size=window_size_s, window_overlap=0.5, cutoff_length=0.1)
-    for subject_id, raw in enumerate(raws):
+    for subject_id, raw in enumerate(dataset):
         try:
             x = segmenter.segment(raw)
             annot_from_events = mne.annotations_from_events(events=x.events, event_desc=event_mapping, sfreq=x.info['sfreq'])
