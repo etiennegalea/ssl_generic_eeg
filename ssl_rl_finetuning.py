@@ -573,8 +573,8 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
     print(f'{len(os.listdir(data_dir))} files found')
     for i, path in enumerate(os.listdir(data_dir)):
         # limiter
-        if i == 25:
-           break
+        # if i == 25:
+        #    break
             
         full_path = os.path.join(data_dir, path)
         raw = mne.io.read_raw_fif(full_path)
@@ -786,9 +786,9 @@ def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sampl
     raw_paths, descriptions, classification = shuffle(raw_paths, descriptions, classification)
 
     # limiters
-    raw_paths = raw_paths[:20]
-    descriptions = descriptions[:20]
-    classification = classification[:20]
+    # raw_paths = raw_paths[:20]
+    # descriptions = descriptions[:20]
+    # classification = classification[:20]
 
     # load data and set annotations
     dataset = []
@@ -904,9 +904,9 @@ def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size
 
 
     # limiters
-    raw_paths = raw_paths[:20]
-    descriptions = descriptions[:20]
-    classification = classification[:20]
+    # raw_paths = raw_paths[:20]
+    # descriptions = descriptions[:20]
+    # classification = classification[:20]
 
     # load data and set annotations
     dataset = []
