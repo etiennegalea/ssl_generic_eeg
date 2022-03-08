@@ -438,18 +438,18 @@ def create_windows_dataset(raws, window_size_samples, descriptions=None, mapping
 
 
 # check factor of 10 for space
-def check_factor_loop(self, n, arr, factor):
+def check_factor_loop(n, arr, factor):
     if factor < n:
-        arr += [self.check_factor_loop(n, arr, factor*10)]
+        arr += [check_factor_loop(n, arr, factor*10)]
     else:
         return n
     return factor
     
-def factored_space(self, n):
+def factored_space(n):
     arr = []
-    arr += [self.check_factor_loop(n, arr, factor=10)]
-    return arr[::-1]
-        
+    arr += [check_factor_loop(n, arr, factor=10)]
+    return np.array(arr[::-1])
+
 # ---------------------------------- LOADING DATASETS ----------------------------------
 
 
