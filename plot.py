@@ -14,7 +14,9 @@ from sklearn.manifold import TSNE
 import plotly.express as px
 from datetime import datetime
 
-from helper_funcs import HelperFuncs as hf
+from helper_funcs import HelperFuncs
+
+hf = HelperFuncs()
 
 
 class Plot:
