@@ -43,7 +43,7 @@ class HelperFuncs():
         return dt.strftime("%Y_%m_%d") if dateonly else dt.strftime("%Y_%m_%d__%H_%M")
 
     # attempting to enable GPU processing
-    def enable_cuda():
+    def enable_cuda(self):
         device = 'cpu'
         if torch.cuda.is_available():
             print(':: CUDA enabled - using GPU')
@@ -62,7 +62,7 @@ class HelperFuncs():
         return x.split('/')[-1]
 
     # check for existing folder/s and create them if directory does not exist
-    def check_dir(dir):
+    def check_dir(self, dir):
         Path(dir).mkdir(parents=True, exist_ok=True)
 
     # generate simulated noisy signals (sinusoidal waves w/ noise)
