@@ -186,7 +186,7 @@ class Plot:
         print('Done')
 
     # Plot learning curves for fully-supervised and self-supervised logistic regression
-    def plot_learning_curves_sklearn(self, ssl_train_sizes, raw_train_sizes, ssl_train_scores, ssl_test_scores, raw_train_scores, raw_test_scores, dataset_name):
+    def plot_learning_curves_sklearn(self, ssl_train_sizes, raw_train_sizes, ssl_train_scores, ssl_test_scores, raw_train_scores, raw_test_scores, dataset_name, scoring='balanced_accuracy'):
         # create additional features
         ssl_train_scores_mean, ssl_test_scores_mean = np.mean(ssl_train_scores, axis=1), np.mean(ssl_test_scores, axis=1)
         ssl_train_scores_std, ssl_test_scores_std = np.std(ssl_train_scores, axis=1), np.std(ssl_test_scores, axis=1)
@@ -232,7 +232,7 @@ class Plot:
 
         # plt.ylim(0, 1)
         ax.set_xlabel("Training examples")
-        ax.set_ylabel("Balanced Accuracy")
+        ax.set_ylabel(scoring)
 
         ax.set_title(f'Fully-Supervised and Self-Supervised Logistic Regression scores per Training Example for {dataset_name} dataset')
         # plt.plot(ssl_train_sizes, ssl_train_scores_mean, color='r', label='SSL Training Score')
