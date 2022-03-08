@@ -40,6 +40,7 @@ from ContrastiveNet import *
 from RelativePositioningDataset import *
 from plot import Plot
 from segment import Segmenter
+from segment_tuar import Segmenter_TUAR
 
 
 
@@ -946,35 +947,46 @@ def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size
 def load_tuar_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s):
     print(':: loading TUAR data')
 
-    data_dir = 'data/tuar/v2_1_0/processed/'
-    # data_dir = '/media/maligan/My Passport/msc_thesis/data/tuar/v2_1_0/processed/'
+    # data_dir = 'data/tuar/v2_1_0/processed/'
+    data_dir = '/media/maligan/My Passport/msc_thesis/data/tuar/v2_1_0/processed/'
     raws = []
 
     print(f'{len(os.listdir(data_dir))} files found')
     for i, path in enumerate(os.listdir(data_dir)):
         # limiter
-        if i == 5:
-           break
+        # if i == 10:
+        #    break
             
         full_path = os.path.join(data_dir, path)
         raw = mne.io.read_raw_fif(full_path)
-        raws.append(raw)
+        try:
+            raw = raw.resample(sfreq)   # resample
+            raw = raw.filter(l_freq=low_cut_hz, h_freq=high_cut_hz, n_jobs=n_jobs)    # filtering
+            raws.append(raw)
+        except:
+            print(f'Error @ {path}')
+            pass
+
+        
 
 
     # preprocess dataset
-    dataset = preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs)
+    # dataset = preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs)
     event_mapping = {0: 'artifact', 1: 'non-artifact', 2:'ignore'}
 
     # segment dataset recordings into windows and add descriptions
     raws, descriptions = [], []
-    segmenter = Segmenter(window_size=window_size_s, window_overlap=0.5, cutoff_length=0.1)
-    for subject_id, raw in enumerate(dataset):
-        x = segmenter.segment(raw)
-        annot_from_events = mne.annotations_from_events(events=x.events, event_desc=event_mapping, sfreq=x.info['sfreq'])
-        duration_per_event = [x.times[-1]+x.times[1]]
-        annot_from_events.duration = np.array(duration_per_event * len(x.events))
-        raws += [raw.set_annotations(annot_from_events)]
-        descriptions += [{"subject": int(subject_id), "recording": raw}]
+    segmenter = Segmenter_TUAR(window_size=window_size_s, window_overlap=0.5, cutoff_length=0.1)
+    for subject_id, raw in enumerate(raws):
+        try:
+            x = segmenter.segment(raw)
+            annot_from_events = mne.annotations_from_events(events=x.events, event_desc=event_mapping, sfreq=x.info['sfreq'])
+            duration_per_event = [x.times[-1]+x.times[1]]
+            annot_from_events.duration = np.array(duration_per_event * len(x.events))
+            raws += [raw.set_annotations(annot_from_events)]
+            descriptions += [{"subject": int(subject_id), "recording": raw}]
+        except:
+            pass
     
 
     # create windows from epochs and descriptions

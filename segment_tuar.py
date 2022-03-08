@@ -2,7 +2,7 @@ import mne
 import numpy as np
 import pandas as pd
 
-class Segmenter:
+class Segmenter_TUAR:
 
     # Segmentation and mapping parameters (in seconds)
     def __init__(self, window_size=1.0, window_overlap=0.5, cutoff_length=0.1, descriptions=None):
@@ -115,32 +115,32 @@ class Segmenter:
 ###########################################################################################
 
 
-segmenter = Segmenter(window_size=5, window_overlap=0.5, cutoff_length=0.1)
+# segmenter = Segmenter_TUAR(window_size=5, window_overlap=0.5, cutoff_length=0.1)
 
-# Input preprocessed recording
-infile_path = '/media/maligan/My Passport/msc_thesis/data/tuar/v2_1_0/processed/00000647_s002_t000_2_channels.fif'
-# Load recording
-raw = mne.io.read_raw_fif(infile_path, preload=True)
-# Print existing annotations
-print(raw.info)
-print(raw.annotations)
-# Segment continuous EEG recording
-print('Segmenting ...')
+# # Input preprocessed recording
+# infile_path = '/media/maligan/My Passport/msc_thesis/data/tuar/v2_1_0/processed/00000647_s002_t000_2_channels.fif'
+# # Load recording
+# raw = mne.io.read_raw_fif(infile_path, preload=True)
+# # Print existing annotations
+# print(raw.info)
+# print(raw.annotations)
+# # Segment continuous EEG recording
+# print('Segmenting ...')
 
-segmented_raw = segmenter.segment(raw)
+# segmented_raw = segmenter.segment(raw)
 
-# print('Number of generated segments is {}'.format(len(segmented_raw.events)))
-# Map created segments to existing annotation interval to assign event ids
-print('Mapping segments onto artifact annotation intervals ...')
-# segments_mapped = _map_artifacts(preprocessed_recording, segmented_raw, windowSize=WINDOW_SIZE, cutoffLength=CUTOFF_LENGTH)
-# Update metadata
-# segments_mapped._metadata = _segment_metadata(preprocessed_recording, segments_mapped.events, WINDOW_SIZE)
+# # print('Number of generated segments is {}'.format(len(segmented_raw.events)))
+# # Map created segments to existing annotation interval to assign event ids
+# print('Mapping segments onto artifact annotation intervals ...')
+# # segments_mapped = _map_artifacts(preprocessed_recording, segmented_raw, windowSize=WINDOW_SIZE, cutoffLength=CUTOFF_LENGTH)
+# # Update metadata
+# # segments_mapped._metadata = _segment_metadata(preprocessed_recording, segments_mapped.events, WINDOW_SIZE)
 
-# Print results
-ids = [e[2] for e in segmented_raw.events]  # all ids
-idx_ignore = [id for id, id_ in enumerate(ids) if id_ == 2]  # ids of segments to ignore
-idx_artifacts = [id for id, id_ in enumerate(ids) if id_ == 0]  # ids of artifact segments
-idx_nonartifacts = [id for id, id_ in enumerate(ids) if id_ == 1]  # ids of nonartifact segments
-print('Number of artifact segments is {}'.format(len(idx_artifacts)))
-print('Number of non-artifact segments is {}'.format(len(idx_nonartifacts)))
-print('Number of segments to ignore is {}'.format(len(idx_ignore)))
+# # Print results
+# ids = [e[2] for e in segmented_raw.events]  # all ids
+# idx_ignore = [id for id, id_ in enumerate(ids) if id_ == 2]  # ids of segments to ignore
+# idx_artifacts = [id for id, id_ in enumerate(ids) if id_ == 0]  # ids of artifact segments
+# idx_nonartifacts = [id for id, id_ in enumerate(ids) if id_ == 1]  # ids of nonartifact segments
+# print('Number of artifact segments is {}'.format(len(idx_artifacts)))
+# print('Number of non-artifact segments is {}'.format(len(idx_nonartifacts)))
+# print('Number of segments to ignore is {}'.format(len(idx_ignore)))
