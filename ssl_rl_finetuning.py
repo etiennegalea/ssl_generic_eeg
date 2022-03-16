@@ -589,7 +589,7 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s,
         disorder = 2 if 'ASD' in path else 1 if 'EP' in path else 0
         subject_id = int(path.split('.')[1][1:])
         descriptions += [{'subject': subject_id, 'eyes_close_open_rest': eyes_close_open_rest, 'disorder': disorder, 'filename': path.split('/')[-1]}]
-        raw += [raw.set_annotations(mne.Annotations(onset=[0], duration=raw.times.max(), description=[disorder]))]
+        raws += [raw.set_annotations(mne.Annotations(onset=[0], duration=raw.times.max(), description=[disorder]))]
 
 
     # preprocess dataset
