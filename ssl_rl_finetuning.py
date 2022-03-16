@@ -51,7 +51,7 @@ from segment_tuar import Segmenter_TUAR
 
 ### Load model
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='scopolamine', help='Dataset for downstream task: \
+@click.option('--dataset_name', '--dataset', '-n', default='space_bambi', help='Dataset for downstream task: \
     "space_bambi", "sleep_staging", "tuh_abnormal", "scopolamine", "white_noise", "bci".')
 @click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
 # @click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
@@ -115,7 +115,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             windows_dataset = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
             annotations = ['abnormal', 'normal']
         elif dataset_name == 'space_bambi':
-            windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
+            windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s, window_size_samples)
             annotations = ['artifact', 'non-artifact', 'ignored']
         elif dataset_name == 'scopolamine':
             windows_dataset = load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
@@ -187,8 +187,9 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
                 raw_vectors = [batch_x.to(device).cpu().numpy() for batch_x, _, _ in loader]
             data[name] = (np.concatenate(feats), split.get_metadata()['target'].values)
             # concatenate channels and duplicate labels
-            raw_data[name] = (np.concatenate(np.concatenate(raw_vectors)), np.tile(splitted[name].get_metadata()['target'].values, n_channels))
-
+            # raw_data[name] = (np.concatenate(np.concatenate(raw_vectors)), np.tile(splitted[name].get_metadata()['target'].values, n_channels))
+            # concatenate channels per window such that you will have 10s windows
+            raw_data[name] = ([np.concatenate(x.T) for x in np.concatenate(raw_vectors)], splitted[name].get_metadata()['target'].values)
 
         # combine all vectors (X) and labels (y) from DATA sets
         X = np.concatenate([v[0] for k, v in data.items()])
@@ -291,8 +292,8 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
 
 
     ### Visualizing clusters
-    p.plot_PCA(X, y, annotations)
-    p.plot_TSNE(X, y, annotations)
+    # p.plot_PCA(X, y, annotations)
+    # p.plot_TSNE(X, y, annotations)
     p.plot_UMAP(X, y, annotations)
     # if connectivity_plot:
     #     p.plot_UMAP_connectivity(X)
@@ -303,8 +304,8 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
 
     # plotting with raw data (not embeddings)
     p_fs = Plot('RAW_'+dataset_name, metadata_string, show=show_plots)
-    p_fs.plot_PCA(X_raw, y_raw, annotations)
-    p_fs.plot_TSNE(X_raw, y_raw, annotations)
+    # p_fs.plot_PCA(X_raw, y_raw, annotations)
+    # p_fs.plot_TSNE(X_raw, y_raw, annotations)
     p_fs.plot_UMAP(X_raw, y_raw, annotations)
     # if connectivity_plot:
     #     p_fs.plot_UMAP_connectivity(X_raw)
@@ -561,56 +562,79 @@ def load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_sample
     return windows_dataset
 
 
-def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s):
+def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s, window_size_samples):
     print(':: loading SPACE/BAMBI data')
 
     # space_bambi directory
-    data_dir = './data/SPACE_BAMBI_rereferenced/'
-    # data_dir = '/media/maligan/My Passport/msc_thesis/data/SPACE_BAMBI_rereferenced/'
-
-    raws = []
+    # data_dir = './data/SPACE_BAMBI_2channels/'
+    data_dir = '/media/maligan/My Passport/msc_thesis/data/SPACE_BAMBI_2channels/'
 
     print(f'{len(os.listdir(data_dir))} files found')
+    raws, descriptions = [], []
     for i, path in enumerate(os.listdir(data_dir)):
         # limiter
-        # if i == 25:
-        #    break
+        if i == 5:
+           break
             
         full_path = os.path.join(data_dir, path)
-        raw = mne.io.read_raw_fif(full_path)
-        raws.append(raw)
+        raw = mne.io.read_raw_fif(full_path, preload=True)
+
+        # DESCRIPTIONS
+        # ECR - eyes closed rest (0 - closed)
+        # EOR - eyes open rest (1 - open)
+        # HE - healthy (0 - HE)
+        # EP - epilepsy (1 - EP)
+        # ASD - autism spectrum disorder (2 - ASD)
+        eyes_close_open_rest = 0 if 'ECR' in path else 1
+        disorder = 2 if 'ASD' in path else 1 if 'EP' in path else 0
+        subject_id = int(path.split('.')[1][1:])
+        descriptions += [{'subject': subject_id, 'eyes_close_open_rest': eyes_close_open_rest, 'disorder': disorder, 'filename': path.split('/')[-1]}]
+        raw += [raw.set_annotations(mne.Annotations(onset=[0], duration=raw.times.max(), description=[disorder]))]
 
 
     # preprocess dataset
     dataset = preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs)
-    event_mapping = {0: 'artifact', 1: 'non-artifact', 2:'ignore'}
-
-    # segment dataset recordings into windows and add descriptions
-    raws, descriptions = [], []
-    segmenter = Segmenter(window_size=window_size_s, window_overlap=0.5, cutoff_length=0.1)
-    for subject_id, raw in enumerate(dataset):
-        x = segmenter.segment(raw)
-        annot_from_events = mne.annotations_from_events(events=x.events, event_desc=event_mapping, sfreq=x.info['sfreq'])
-        duration_per_event = [x.times[-1]+x.times[1]]
-        annot_from_events.duration = np.array(duration_per_event * len(x.events))
-        raws += [raw.set_annotations(annot_from_events)]
-        descriptions += [{"subject": int(subject_id), "recording": raw}]
-    
-
-    # create windows from epochs and descriptions
-    ds = BaseConcatDataset([BaseDataset(raws[i], descriptions[i]) for i in range(len(descriptions))])
 
     mapping = {
-        'artifact': 0,
-        'non-artifact': 1,
-        'ignore': 2
+        'healthy': 0,
+        'epilepsy': 1,
+        'ASD': 2
     }
 
-    windows_dataset = create_windows_from_events(
-        ds, 
-        mapping = mapping,
-    )
+    # create windows
+    windows_dataset = create_windows_dataset(dataset, window_size_samples, descriptions, mapping)
 
+    # ----------------------------------
+
+    # event_mapping = {0: 'artifact', 1: 'non-artifact', 2:'ignore'}
+
+    # segment dataset recordings into windows and add descriptions
+    # raws = []
+    # segmenter = Segmenter(window_size=window_size_s, window_overlap=0.5, cutoff_length=0.1)
+    # for subject_id, raw in enumerate(dataset):
+    #     x = segmenter.segment(raw)
+    #     annot_from_events = mne.annotations_from_events(events=x.events, event_desc=event_mapping, sfreq=x.info['sfreq'])
+    #     duration_per_event = [x.times[-1]+x.times[1]]
+    #     annot_from_events.duration = np.array(duration_per_event * len(x.events))
+    #     raws += [raw.set_annotations(annot_from_events)]
+    #     # descriptions += [{"subject": int(subject_id), "recording": raw}]
+    
+
+    # # create windows from epochs and descriptions
+    # ds = BaseConcatDataset([BaseDataset(raws[i], descriptions[i]) for i in range(len(descriptions))])
+
+    # mapping = {
+    #     'artifact': 0,
+    #     'non-artifact': 1,
+    #     'ignore': 2
+    # }
+
+    # windows_dataset = create_windows_from_events(
+    #     ds, 
+    #     mapping = mapping,
+    # )
+
+    #  ----------------------------------
 
     # channel-wise zscore normalization
     preprocess(windows_dataset, [Preprocessor(zscore)])
@@ -730,8 +754,8 @@ def load_scopolamine_test_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_si
 def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
     print(':: loading TUH abnormal data')
 
-    data_dir = 'data/tuh_abnormal_data/eval/'
-    # data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
+    # data_dir = 'data/tuh_abnormal_data/eval/'
+    data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
 
     # build data dictionary
     annotations = {}
@@ -743,7 +767,7 @@ def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sampl
                 dates = {}
                 for date in hf.get_file_list(recording):
                     for raw_path in hf.get_file_list(date):
-                        if '_2_channels.fif' in hf.get_id(raw_path):
+                        if '_2_channels_reref.fif' in hf.get_id(raw_path):
                             break
                         else:
                             pass
@@ -783,9 +807,9 @@ def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sampl
     raw_paths, descriptions, classification = shuffle(raw_paths, descriptions, classification)
 
     # limiters
-    # raw_paths = raw_paths[:20]
-    # descriptions = descriptions[:20]
-    # classification = classification[:20]
+    raw_paths = raw_paths[:25]
+    descriptions = descriptions[:25]
+    classification = classification[:25]
 
     # load data and set annotations
     dataset = []
@@ -944,8 +968,8 @@ def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size
 def load_tuar_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s):
     print(':: loading TUAR data')
 
-    data_dir = 'data/tuar/v2_1_0/processed/'
-    # data_dir = '/media/maligan/My Passport/msc_thesis/data/tuar/v2_1_0/processed/'
+    # data_dir = 'data/tuar/v2_1_0/processed/'
+    data_dir = '/media/maligan/My Passport/msc_thesis/data/tuar/v2_1_0/processed/'
     raws = []
 
     print(f'{len(os.listdir(data_dir))} files found')
@@ -973,7 +997,7 @@ def load_tuar_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s):
 
     # segment dataset recordings into windows and add descriptions
     raws, descriptions = [], []
-    segmenter = Segmenter_TUAR(window_size=window_size_s, window_overlap=0.5, cutoff_length=0.1)
+    segmenter = Segmenter_TUAR(window_size=window_size_s, window_overlap=0.5, cutoff_length=4)
     for subject_id, raw in enumerate(dataset):
         try:
             x = segmenter.segment(raw)
