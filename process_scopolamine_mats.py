@@ -1,20 +1,5 @@
 import mne
-import sys
 import os
-import importlib
-
-from braindecode.preprocessing.preprocess import preprocess, Preprocessor, zscore
-from braindecode.datasets import (create_from_mne_raw, create_from_mne_epochs)
-from braindecode.preprocessing.windowers import create_windows_from_events
-from braindecode.datasets.sleep_physionet import SleepPhysionet
-from braindecode.datasets import BaseDataset, BaseConcatDataset, WindowsDataset
-from mne_extras import write_edf
-
-from plot import Plot
-from segment import Segmenter
-
-import matplotlib.pyplot as plt
-
 from mat73 import loadmat
 from tqdm import tqdm
 
@@ -39,8 +24,14 @@ def load_mats(path, info, classification, dataset, descriptions):
         # try:
         mat = mat.split('.mat')[0]
 
+
+        # preprocess
+        raw = raw.resample(100)   # resample
+        raw = raw.filter(l_freq=0.5, h_freq=30, n_jobs=1)    # filtering
+
+
         print(f':: {classification} ~ {mat}')
-        to_export = f'/media/maligan/My Passport/msc_thesis/data/scopolamine_converted/{classification}/{mat}.fif'
+        to_export = f'/media/maligan/My Passport/msc_thesis/data/scopolamine_preprocessed/{classification}/{mat}.fif'
         print(f':: {to_export}')
         raw.save(to_export)
         # except:
@@ -66,9 +57,9 @@ m11 = '/media/maligan/My Passport/msc_thesis/data/scopolamine/M11/'
 dataset, descriptions = [], []
 info = mne.create_info(ch_names=['Fpz-cz', 'Pz-Oz'], ch_types=['eeg']*2, sfreq=1012)
 
-dataset, descriptions = load_mats(m01, info, 'm01', dataset, descriptions)
-dataset, descriptions = load_mats(m05, info, 'm05', dataset, descriptions)
-dataset, descriptions = load_mats(m11, info, 'm11', dataset, descriptions)
+dataset, descriptions = load_mats(m01, info, 'M01', dataset, descriptions)
+dataset, descriptions = load_mats(m05, info, 'M05', dataset, descriptions)
+dataset, descriptions = load_mats(m11, info, 'M11', dataset, descriptions)
 
 print('Errors while saving:')
 print(errors) if errors else print('None!')
