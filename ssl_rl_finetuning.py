@@ -117,7 +117,8 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         elif dataset_name == 'space_bambi':
             windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s, window_size_samples)
             annotations = ['artifact', 'non-artifact', 'ignored']
-            mapping = ['healthy', 'epilepsy', 'ASD']
+            # mapping = ['healthy', 'epilepsy', 'ASD']
+            mapping = ['open', 'closed']
         elif dataset_name == 'scopolamine':
             windows_dataset = load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
             annotations = ['M01', 'M05', 'M11']
@@ -183,7 +184,8 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
                 # make a copy of the vectors WITHOUT passing them through the pretrained model
                 raw_vectors = [batch_x.to(device).cpu().numpy() for batch_x, _, _ in loader]
             # descriptions values according to dataset in use: CHANGE MANUALLY
-            descriptions[name] = split.get_metadata()['disorder'].values
+            # descriptions[name] = split.get_metadata()['disorder'].values
+            descriptions[name] = split.get_metadata()['eyes_close_open_rest'].values
             data[name] = (np.concatenate(feats), split.get_metadata()['target'].values)
             # concatenate channels per window such that you will have 10s windows
             raw_data[name] = ([np.concatenate(x.T) for x in np.concatenate(raw_vectors)], split.get_metadata()['target'].values)
@@ -573,13 +575,8 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s,
     print(f'{len(os.listdir(data_dir))} files found')
     raws, descriptions = [], []
     for i, path in enumerate(os.listdir(data_dir)):
-        # limiter
-        # if i == 5:
-        #    break
-            
         full_path = os.path.join(data_dir, path)
         raws += [mne.io.read_raw_fif(full_path, preload=True)]
-
 
         # DESCRIPTIONS
         # ECR - eyes closed rest (0 - closed)
@@ -591,22 +588,18 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s,
         disorder = 2 if 'ASD' in path else 1 if 'EP' in path else 0
         subject_id = int(path.split('.')[1][1:])
         descriptions += [{'subject': subject_id, 'eyes_close_open_rest': eyes_close_open_rest, 'disorder': disorder, 'filename': path.split('/')[-1]}]
-        # raws += [raw.set_annotations(mne.Annotations(onset=[0], duration=raw.times.max(), description=[disorder]))]
 
+
+    # shuffle raw_paths and descriptions
+    from sklearn.utils import shuffle
+    raws, descriptions = shuffle(raws, descriptions)
+    
+    # limiter
+    raws = raws[:120]
+    descriptions = descriptions[:120]
 
     # preprocess dataset
     dataset = preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs)
-
-    # mapping = {
-    #     'healthy': 0,
-    #     'epilepsy': 1,
-    #     'ASD': 2
-    # }
-
-    # create windows
-    # windows_dataset = create_windows_dataset(dataset, window_size_samples, descriptions, mapping)
-
-    # ----------------------------------
 
     event_mapping = {0: 'artifact', 1: 'non-artifact', 2:'ignore'}
 
@@ -619,7 +612,6 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s,
         duration_per_event = [x.times[-1]+x.times[1]]
         annot_from_events.duration = np.array(duration_per_event * len(x.events))
         raws += [raw.set_annotations(annot_from_events)]
-        # descriptions += [{"subject": int(subject_id), "recording": raw}]
     
 
     # # create windows from epochs and descriptions
@@ -635,8 +627,6 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s,
         ds, 
         mapping = mapping,
     )
-
-    #  ----------------------------------
 
     # channel-wise zscore normalization
     preprocess(windows_dataset, [Preprocessor(zscore)])
