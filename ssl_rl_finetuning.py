@@ -184,7 +184,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
                 # make a copy of the vectors WITHOUT passing them through the pretrained model
                 raw_vectors = [batch_x.to(device).cpu().numpy() for batch_x, _, _ in loader]
             # descriptions values according to dataset in use: CHANGE MANUALLY
-            # descriptions[name] = split.get_metadata()['disorder'].values
+            descriptions[name] = split.get_metadata()['disorder'].values
             data[name] = (np.concatenate(feats), split.get_metadata()['target'].values)
             # concatenate channels per window such that you will have 10s windows
             raw_data[name] = ([np.concatenate(x.T) for x in np.concatenate(raw_vectors)], split.get_metadata()['target'].values)
@@ -292,23 +292,24 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
 
         X, y = feature_vectors[0], feature_vectors[1]
 
+    # select only non-artifacts
     clean_X, clean_y, clean_desc = [], [], []
     for k,v in enumerate(X):
         if y[k] == 1:
             clean_X += [v]
             clean_y += [y[k]]
             clean_desc += [desc[k]]
-
+    clean_X, clean_y = np.array(clean_X), np.array(clean_y)
 
     ### Visualizing clusters
     # p.plot_PCA(X, y, annotations)
     # p.plot_TSNE(X, y, annotations)
-    p.plot_UMAP(clean_X, clean_y, annotations, mapping, desc)
+    p.plot_UMAP(clean_X, clean_y, annotations, mapping, clean_desc)
     # if connectivity_plot:
     #     p.plot_UMAP_connectivity(X)
     # if edge_bundling_plot:
     #     p.plot_UMAP_connectivity(X, edge_bundling=True)
-    p.plot_UMAP_3d(clean_X, clean_y, annotations, mapping, desc)
+    p.plot_UMAP_3d(clean_X, clean_y, annotations, mapping, clean_desc)
 
 
     # plotting with raw data (not embeddings)
