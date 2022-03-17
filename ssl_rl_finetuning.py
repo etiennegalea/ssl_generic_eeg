@@ -117,6 +117,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         elif dataset_name == 'space_bambi':
             windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s, window_size_samples)
             annotations = ['artifact', 'non-artifact', 'ignored']
+            mapping = ['healthy', 'epilepsy', 'ASD']
         elif dataset_name == 'scopolamine':
             windows_dataset = load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
             annotations = ['M01', 'M05', 'M11']
@@ -167,17 +168,13 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         with open(f'{dir}{hf.get_datetime()}_setup_{metadata_string}.txt', "w") as f:
             f.write(pprint.pformat(setup, indent=4, sort_dicts=False))
 
-
-        # init plotting object
-        p = Plot(dataset_name, metadata_string, show=show_plots)
-
         ### with (false) or without (true) sequential layer
         model.emb.return_feats = True
 
         num_workers = n_jobs
 
         # Extract features with the trained embedder
-        data, raw_data = dict(), dict()
+        data, raw_data, descriptions = dict(), dict(), dict()
         for name, split in splitted.items():
             split.return_pair = False  # Return single windows
             loader = DataLoader(split, batch_size=batch_size, num_workers=num_workers)
@@ -185,15 +182,16 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
                 feats = [model.emb(batch_x.to(device)).cpu().numpy() for batch_x, _, _ in loader]
                 # make a copy of the vectors WITHOUT passing them through the pretrained model
                 raw_vectors = [batch_x.to(device).cpu().numpy() for batch_x, _, _ in loader]
+            # descriptions values according to dataset in use: CHANGE MANUALLY
+            descriptions[name] = split.get_metadata()['disorder'].values
             data[name] = (np.concatenate(feats), split.get_metadata()['target'].values)
-            # concatenate channels and duplicate labels
-            # raw_data[name] = (np.concatenate(np.concatenate(raw_vectors)), np.tile(splitted[name].get_metadata()['target'].values, n_channels))
             # concatenate channels per window such that you will have 10s windows
-            raw_data[name] = ([np.concatenate(x.T) for x in np.concatenate(raw_vectors)], splitted[name].get_metadata()['target'].values)
+            raw_data[name] = ([np.concatenate(x.T) for x in np.concatenate(raw_vectors)], split.get_metadata()['target'].values)
 
         # combine all vectors (X) and labels (y) from DATA sets
         X = np.concatenate([v[0] for k, v in data.items()])
         y = np.concatenate([v[1] for k, v in data.items()])
+        desc = np.concatenate([v for k, v in descriptions.items()])
 
         # combine all vectors (X) and labels (y) from RAW_DATA sets
         X_raw = np.concatenate([v[0] for k, v in raw_data.items()])
@@ -245,6 +243,9 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         print(f'Valid bal acc: {valid_bal_acc:0.4f}')
         print(f'Test bal acc: {test_bal_acc:0.4f}')
 
+        # init plotting object
+        p = Plot(dataset_name, metadata_string, show=show_plots)
+
         print('Results on test set:')
         # confusion matrix
         conf_matrix = confusion_matrix(data['test'][1], test_y_pred)
@@ -294,24 +295,24 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
     ### Visualizing clusters
     # p.plot_PCA(X, y, annotations)
     # p.plot_TSNE(X, y, annotations)
-    p.plot_UMAP(X, y, annotations)
+    p.plot_UMAP(X, y, annotations, mapping, desc)
     # if connectivity_plot:
     #     p.plot_UMAP_connectivity(X)
     # if edge_bundling_plot:
     #     p.plot_UMAP_connectivity(X, edge_bundling=True)
-    p.plot_UMAP_3d(X, y)
+    p.plot_UMAP_3d(X, y, annotations, mapping, desc)
 
 
     # plotting with raw data (not embeddings)
     p_fs = Plot('RAW_'+dataset_name, metadata_string, show=show_plots)
     # p_fs.plot_PCA(X_raw, y_raw, annotations)
     # p_fs.plot_TSNE(X_raw, y_raw, annotations)
-    p_fs.plot_UMAP(X_raw, y_raw, annotations)
+    p_fs.plot_UMAP(X_raw, y_raw, annotations, mapping, desc)
     # if connectivity_plot:
     #     p_fs.plot_UMAP_connectivity(X_raw)
     # if edge_bundling_plot:
     #     p_fs.plot_UMAP_connectivity(X_raw, edge_bundling=True)
-    p_fs.plot_UMAP_3d(X_raw, y_raw)
+    p_fs.plot_UMAP_3d(X_raw, y_raw, annotations, mapping, desc)
 
 
 
@@ -566,18 +567,19 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s,
     print(':: loading SPACE/BAMBI data')
 
     # space_bambi directory
-    # data_dir = './data/SPACE_BAMBI_2channels/'
-    data_dir = '/media/maligan/My Passport/msc_thesis/data/SPACE_BAMBI_2channels/'
+    data_dir = './data/SPACE_BAMBI_2channels/'
+    # data_dir = '/media/maligan/My Passport/msc_thesis/data/SPACE_BAMBI_2channels/'
 
     print(f'{len(os.listdir(data_dir))} files found')
     raws, descriptions = [], []
     for i, path in enumerate(os.listdir(data_dir)):
         # limiter
-        if i == 5:
-           break
+        # if i == 5:
+        #    break
             
         full_path = os.path.join(data_dir, path)
-        raw = mne.io.read_raw_fif(full_path, preload=True)
+        raws += [mne.io.read_raw_fif(full_path, preload=True)]
+
 
         # DESCRIPTIONS
         # ECR - eyes closed rest (0 - closed)
@@ -589,50 +591,50 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s,
         disorder = 2 if 'ASD' in path else 1 if 'EP' in path else 0
         subject_id = int(path.split('.')[1][1:])
         descriptions += [{'subject': subject_id, 'eyes_close_open_rest': eyes_close_open_rest, 'disorder': disorder, 'filename': path.split('/')[-1]}]
-        raws += [raw.set_annotations(mne.Annotations(onset=[0], duration=raw.times.max(), description=[disorder]))]
+        # raws += [raw.set_annotations(mne.Annotations(onset=[0], duration=raw.times.max(), description=[disorder]))]
 
 
     # preprocess dataset
     dataset = preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs)
 
-    mapping = {
-        'healthy': 0,
-        'epilepsy': 1,
-        'ASD': 2
-    }
+    # mapping = {
+    #     'healthy': 0,
+    #     'epilepsy': 1,
+    #     'ASD': 2
+    # }
 
     # create windows
-    windows_dataset = create_windows_dataset(dataset, window_size_samples, descriptions, mapping)
+    # windows_dataset = create_windows_dataset(dataset, window_size_samples, descriptions, mapping)
 
     # ----------------------------------
 
-    # event_mapping = {0: 'artifact', 1: 'non-artifact', 2:'ignore'}
+    event_mapping = {0: 'artifact', 1: 'non-artifact', 2:'ignore'}
 
     # segment dataset recordings into windows and add descriptions
-    # raws = []
-    # segmenter = Segmenter(window_size=window_size_s, window_overlap=0.5, cutoff_length=0.1)
-    # for subject_id, raw in enumerate(dataset):
-    #     x = segmenter.segment(raw)
-    #     annot_from_events = mne.annotations_from_events(events=x.events, event_desc=event_mapping, sfreq=x.info['sfreq'])
-    #     duration_per_event = [x.times[-1]+x.times[1]]
-    #     annot_from_events.duration = np.array(duration_per_event * len(x.events))
-    #     raws += [raw.set_annotations(annot_from_events)]
-    #     # descriptions += [{"subject": int(subject_id), "recording": raw}]
+    raws = []
+    segmenter = Segmenter(window_size=window_size_s, window_overlap=0.5, cutoff_length=0.1)
+    for subject_id, raw in enumerate(dataset):
+        x = segmenter.segment(raw)
+        annot_from_events = mne.annotations_from_events(events=x.events, event_desc=event_mapping, sfreq=x.info['sfreq'])
+        duration_per_event = [x.times[-1]+x.times[1]]
+        annot_from_events.duration = np.array(duration_per_event * len(x.events))
+        raws += [raw.set_annotations(annot_from_events)]
+        # descriptions += [{"subject": int(subject_id), "recording": raw}]
     
 
     # # create windows from epochs and descriptions
-    # ds = BaseConcatDataset([BaseDataset(raws[i], descriptions[i]) for i in range(len(descriptions))])
+    ds = BaseConcatDataset([BaseDataset(raws[i], descriptions[i]) for i in range(len(descriptions))])
 
-    # mapping = {
-    #     'artifact': 0,
-    #     'non-artifact': 1,
-    #     'ignore': 2
-    # }
+    mapping = {
+        'artifact': 0,
+        'non-artifact': 1,
+        'ignore': 2
+    }
 
-    # windows_dataset = create_windows_from_events(
-    #     ds, 
-    #     mapping = mapping,
-    # )
+    windows_dataset = create_windows_from_events(
+        ds, 
+        mapping = mapping,
+    )
 
     #  ----------------------------------
 

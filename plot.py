@@ -82,7 +82,7 @@ class Plot:
         print('Done')
 
 
-    def plot_PCA(self, X, y, annotations=['W', 'N1', 'N2', 'N3', 'R']):
+    def plot_PCA(self, X, y, annotations=['W', 'N1', 'N2', 'N3', 'R'], descriptions=[]):
         print(':: plotting PCA... ', end='')
 
         pca = PCA(n_components=2)
@@ -104,7 +104,7 @@ class Plot:
         print('Done')
 
 
-    def plot_TSNE(self, X, y, annotations=['W', 'N1', 'N2', 'N3', 'R']):
+    def plot_TSNE(self, X, y, annotations=['W', 'N1', 'N2', 'N3', 'R'], descriptions=[]):
         print(':: plotting TSNE... ', end='')
 
         tsne = TSNE(n_components=2)
@@ -126,7 +126,7 @@ class Plot:
         print('Done')
 
 
-    def plot_UMAP(self, X, y, annotations=['W', 'N1', 'N2', 'N3', 'R']):
+    def plot_UMAP(self, X, y, annotations, mapping, descriptions=[]):
         print(':: plotting UMAP... ', end='')
         _umap = umap.UMAP(n_neighbors=15)
         umap_components = _umap.fit_transform(X)
@@ -135,6 +135,10 @@ class Plot:
 
         fig, ax = plt.subplots()
         colors = cm.get_cmap('plasma', n_stages)(range(n_stages))
+        # if annotating feature space with descriptions instead
+        if len(descriptions) > 0:
+            annotations = mapping
+            y = descriptions
         for i, stage in enumerate(annotations):
             mask = y == i
             ax.scatter(umap_components[mask, 0], umap_components[mask, 1], s=1, alpha=0.4,
@@ -165,15 +169,25 @@ class Plot:
 
 
     # 3D UMAP plot (plotly)
-    def plot_UMAP_3d(self, X, y):
+    def plot_UMAP_3d(self, X, y, annotations, mapping, descriptions=[]):
         print(':: plotting 3D UMAP... ', end='')
         umap_3d = UMAP(n_components=3, init='random', random_state=0)
         proj_3d = umap_3d.fit_transform(X)
+        map = {k:v for k,v in enumerate(mapping)}
+
+        # if annotating feature space with descriptions instead
+        if len(descriptions) > 0:
+            annotations = mapping
+            y = descriptions
+            
         series = pd.DataFrame(y, columns=['annots'])
+        series['labels'] = series['annots'].map(map)
 
         fig_3d = px.scatter_3d(
-            proj_3d, x=0, y=1, z=2,
-            color=series.annots, labels={'color': 'annots'}
+            proj_3d,
+            x=0, y=1, z=2,
+            color=series.annots,
+            labels={'color': 'labels'}
         )
 
         fig_3d.update_layout(
