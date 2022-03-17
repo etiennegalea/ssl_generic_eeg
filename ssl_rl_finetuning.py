@@ -117,8 +117,8 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         elif dataset_name == 'space_bambi':
             windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s, window_size_samples)
             annotations = ['artifact', 'non-artifact', 'ignored']
-            # mapping = ['healthy', 'epilepsy', 'ASD']
-            mapping = ['open', 'closed']
+            mapping = ['healthy', 'epilepsy', 'ASD']
+            # mapping = ['open', 'closed']
         elif dataset_name == 'scopolamine':
             windows_dataset = load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
             annotations = ['M01', 'M05', 'M11']
@@ -185,7 +185,6 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
                 raw_vectors = [batch_x.to(device).cpu().numpy() for batch_x, _, _ in loader]
             # descriptions values according to dataset in use: CHANGE MANUALLY
             # descriptions[name] = split.get_metadata()['disorder'].values
-            descriptions[name] = split.get_metadata()['eyes_close_open_rest'].values
             data[name] = (np.concatenate(feats), split.get_metadata()['target'].values)
             # concatenate channels per window such that you will have 10s windows
             raw_data[name] = ([np.concatenate(x.T) for x in np.concatenate(raw_vectors)], split.get_metadata()['target'].values)
@@ -293,16 +292,23 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
 
         X, y = feature_vectors[0], feature_vectors[1]
 
+    clean_X, clean_y, clean_desc = [], [], []
+    for k,v in enumerate(X):
+        if y[k] == 1:
+            clean_X += [v]
+            clean_y += [y[k]]
+            clean_desc += [desc[k]]
+
 
     ### Visualizing clusters
     # p.plot_PCA(X, y, annotations)
     # p.plot_TSNE(X, y, annotations)
-    p.plot_UMAP(X, y, annotations, mapping, desc)
+    p.plot_UMAP(clean_X, clean_y, annotations, mapping, desc)
     # if connectivity_plot:
     #     p.plot_UMAP_connectivity(X)
     # if edge_bundling_plot:
     #     p.plot_UMAP_connectivity(X, edge_bundling=True)
-    p.plot_UMAP_3d(X, y, annotations, mapping, desc)
+    p.plot_UMAP_3d(clean_X, clean_y, annotations, mapping, desc)
 
 
     # plotting with raw data (not embeddings)
