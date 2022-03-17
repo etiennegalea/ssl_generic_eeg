@@ -115,10 +115,10 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             windows_dataset = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
             annotations = ['abnormal', 'normal']
         elif dataset_name == 'space_bambi':
-            windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s, window_size_samples)
             annotations = ['artifact', 'non-artifact', 'ignored']
             mapping = ['healthy', 'epilepsy', 'ASD']
             # mapping = ['open', 'closed']
+            windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s, window_size_samples, event_mapping={k:v for k,v in enumerate(mapping)}, keep_nonartifacts=True)
         elif dataset_name == 'scopolamine':
             windows_dataset = load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
             annotations = ['M01', 'M05', 'M11']
@@ -572,7 +572,7 @@ def load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_sample
     return windows_dataset
 
 
-def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s, window_size_samples):
+def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s, window_size_samples, event_mapping={0: 'artifact', 1: 'non-artifact', 2:'ignore'}, keep_nonartifacts=False):
     print(':: loading SPACE/BAMBI data')
 
     # space_bambi directory
@@ -596,26 +596,33 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s,
         subject_id = int(path.split('.')[1][1:])
         descriptions += [{'subject': subject_id, 'eyes_close_open_rest': eyes_close_open_rest, 'disorder': disorder, 'filename': path.split('/')[-1]}]
 
+        # limiter
+        # if i == 5:
+        #     break
+
 
     # shuffle raw_paths and descriptions
     from sklearn.utils import shuffle
     raws, descriptions = shuffle(raws, descriptions)
     
     # limiter
-    raws = raws[:120]
-    descriptions = descriptions[:120]
+    raws = raws
+    descriptions = descriptions
 
     # preprocess dataset
     dataset = preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs)
 
-    event_mapping = {0: 'artifact', 1: 'non-artifact', 2:'ignore'}
-
     # segment dataset recordings into windows and add descriptions
     raws = []
-    segmenter = Segmenter(window_size=window_size_s, window_overlap=0.5, cutoff_length=0.1)
+    segmenter = Segmenter(window_size=window_size_s, window_overlap=0.5, cutoff_length=2.5)
     for subject_id, raw in enumerate(dataset):
-        x = segmenter.segment(raw)
-        annot_from_events = mne.annotations_from_events(events=x.events, event_desc=event_mapping, sfreq=x.info['sfreq'])
+        x = segmenter.segment(raw, drop_artifacts=True)
+        # drop artifacts and ignored if keep_nonartifacts = True, and annotated according to descriptions (disorder or open/closed eyes rest)
+        if keep_nonartifacts:
+            x = x.drop(x.metadata['target'] != 'nonartifact')
+            annot_from_events = mne.annotations_from_events(events=x.events, event_desc={1:event_mapping[disorder]}, sfreq=x.info['sfreq'])
+        else:
+            annot_from_events = mne.annotations_from_events(events=x.events, event_desc=event_mapping, sfreq=x.info['sfreq'])
         duration_per_event = [x.times[-1]+x.times[1]]
         annot_from_events.duration = np.array(duration_per_event * len(x.events))
         raws += [raw.set_annotations(annot_from_events)]
@@ -624,10 +631,16 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s,
     # # create windows from epochs and descriptions
     ds = BaseConcatDataset([BaseDataset(raws[i], descriptions[i]) for i in range(len(descriptions))])
 
+    # mapping = {
+    #     'artifact': 0,
+    #     'non-artifact': 1,
+    #     'ignore': 2
+    # }
+
     mapping = {
-        'artifact': 0,
-        'non-artifact': 1,
-        'ignore': 2
+        'healthy': 0,
+        'epilepsy': 1,
+        'ASD': 2
     }
 
     windows_dataset = create_windows_from_events(

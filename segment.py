@@ -87,7 +87,7 @@ class Segmenter:
         return mapped_segments
         
 
-    def segment(self, raw):
+    def segment(self, raw, drop_artifacts=False):
         sfreq = raw.info["sfreq"]
         # Epoch length in timepoints/samples
         epoch_length_timepoints = sfreq * self.window_size
