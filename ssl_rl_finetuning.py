@@ -594,25 +594,27 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s,
         subject_id = int(path.split('.')[1][1:])
         descriptions += [{'subject': subject_id, 'eyes_close_open_rest': eyes_close_open_rest, 'disorder': disorder, 'filename': path.split('/')[-1]}]
 
+        full_path = os.path.join(data_dir, path)
+        raws += [mne.io.read_raw_fif(full_path, preload=True)]
+
     # limit number of instances to min of all classes (for balanced dataset)
-    
-    n_classes = len(np.unique([record['disorder'] for record in descriptions]))
-    counts = [0 for i in range(n_classes)]
-    for x in descriptions:
-        counts[x['disorder']] += 1
-    limiter = np.min(counts)
+    # n_classes = len(np.unique([record['disorder'] for record in descriptions]))
+    # counts = [0 for i in range(n_classes)]
+    # for x in descriptions:
+    #     counts[x['disorder']] += 1
+    # limiter = np.min(counts)
 
     # reinit counts
-    counts = [0 for i in range(n_classes)]
-    raws, new_descriptions = [], []
-    # load raws according to limiter
-    for i, path in enumerate(os.listdir(data_dir)):
-        if counts[descriptions[i]['disorder']] <= limiter:
-            full_path = os.path.join(data_dir, path)
-            raws += [mne.io.read_raw_fif(full_path, preload=True)]
-            new_descriptions += [descriptions[i]]
-        counts[descriptions[i]['disorder']] += 1
-    descriptions = new_descriptions
+    # counts = [0 for i in range(n_classes)]
+    # raws, new_descriptions = [], []
+    # # load raws according to limiter
+    # for i, path in enumerate(os.listdir(data_dir)):
+    #     if counts[descriptions[i]['disorder']] <= limiter:
+    #         full_path = os.path.join(data_dir, path)
+    #         raws += [mne.io.read_raw_fif(full_path, preload=True)]
+    #         new_descriptions += [descriptions[i]]
+    #     counts[descriptions[i]['disorder']] += 1
+    # descriptions = new_descriptions
 
     # shuffle raw_paths and descriptions
     from sklearn.utils import shuffle
