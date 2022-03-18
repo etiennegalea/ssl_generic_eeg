@@ -33,6 +33,7 @@ from sklearn.model_selection import train_test_split, learning_curve, cross_val_
 
 from  mat73 import loadmat
 import matplotlib.pyplot as plt
+import tqdm
 
 # classes
 from helper_funcs import HelperFuncs as hf
@@ -255,7 +256,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         p.plot_confusion_matrix(conf_matrix)
 
         # classification report
-        class_report = classification_report(data['test'][1], test_y_pred)
+        class_report = classification_report(data['test'][1], test_y_pred, target_names=annotations)
         print(class_report)
         # save report
         dir = 'classification_reports/downstream/'
@@ -380,7 +381,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         p.plot_confusion_matrix(conf_matrix, 'FS')
 
         # classification report
-        class_report = classification_report(raw_data['test'][1], test_y_pred)
+        class_report = classification_report(raw_data['test'][1], test_y_pred, target_names=annotations)
         print(class_report)
         # save report
         dir = 'classification_reports/downstream/FS/'
@@ -576,15 +577,12 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s,
     print(':: loading SPACE/BAMBI data')
 
     # space_bambi directory
-    data_dir = './data/SPACE_BAMBI_2channels/'
-    # data_dir = '/media/maligan/My Passport/msc_thesis/data/SPACE_BAMBI_2channels/'
+    # data_dir = './data/SPACE_BAMBI_2channels/'
+    data_dir = '/media/maligan/My Passport/msc_thesis/data/SPACE_BAMBI_2channels/'
 
     print(f'{len(os.listdir(data_dir))} files found')
-    raws, descriptions = [], []
+    descriptions = []
     for i, path in enumerate(os.listdir(data_dir)):
-        full_path = os.path.join(data_dir, path)
-        raws += [mne.io.read_raw_fif(full_path, preload=True)]
-
         # DESCRIPTIONS
         # ECR - eyes closed rest (0 - closed)
         # EOR - eyes open rest (1 - open)
@@ -596,25 +594,29 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s,
         subject_id = int(path.split('.')[1][1:])
         descriptions += [{'subject': subject_id, 'eyes_close_open_rest': eyes_close_open_rest, 'disorder': disorder, 'filename': path.split('/')[-1]}]
 
-        # limiter
-        # if i == 5:
-        #     break
-
-
-    # shuffle raw_paths and descriptions
-    from sklearn.utils import shuffle
-    raws, descriptions = shuffle(raws, descriptions)
-
     # limit number of instances to min of all classes (for balanced dataset)
+    
     n_classes = len(np.unique([record['disorder'] for record in descriptions]))
     counts = [0 for i in range(n_classes)]
     for x in descriptions:
         counts[x['disorder']] += 1
     limiter = np.min(counts)
 
-    # limiter
-    raws = raws[:limiter]
-    descriptions = descriptions[:limiter]
+    # reinit counts
+    counts = [0 for i in range(n_classes)]
+    raws, new_descriptions = [], []
+    # load raws according to limiter
+    for i, path in enumerate(os.listdir(data_dir)):
+        if counts[descriptions[i]['disorder']] <= limiter:
+            full_path = os.path.join(data_dir, path)
+            raws += [mne.io.read_raw_fif(full_path, preload=True)]
+            new_descriptions += [descriptions[i]]
+        counts[descriptions[i]['disorder']] += 1
+    descriptions = new_descriptions
+
+    # shuffle raw_paths and descriptions
+    from sklearn.utils import shuffle
+    raws, descriptions = shuffle(raws, descriptions)
 
     # preprocess dataset
     dataset = preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs)
