@@ -118,7 +118,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             annotations = ['artifact', 'non-artifact', 'ignored']
             mapping = ['healthy', 'epilepsy', 'ASD']
             # mapping = ['open', 'closed']
-            windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s, window_size_samples, event_mapping={k:v for k,v in enumerate(mapping)}, keep_nonartifacts=True)
+            windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s, window_size_samples, event_mapping={v:k for k,v in enumerate(mapping)}, drop_artifacts=True)
         elif dataset_name == 'scopolamine':
             windows_dataset = load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
             annotations = ['M01', 'M05', 'M11']
@@ -572,7 +572,7 @@ def load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_sample
     return windows_dataset
 
 
-def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s, window_size_samples, event_mapping={0: 'artifact', 1: 'non-artifact', 2:'ignore'}, keep_nonartifacts=False):
+def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s, window_size_samples, event_mapping={0: 'artifact', 1: 'non-artifact', 2:'ignore'}, drop_artifacts=False):
     print(':: loading SPACE/BAMBI data')
 
     # space_bambi directory
@@ -606,23 +606,24 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s,
     raws, descriptions = shuffle(raws, descriptions)
     
     # limiter
-    raws = raws
-    descriptions = descriptions
+    # raws = raws[:25]
+    # descriptions = descriptions[:25]
 
     # preprocess dataset
     dataset = preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs)
+    
+    reverse_event_mapping = {v:k for k,v in event_mapping.items()}
 
     # segment dataset recordings into windows and add descriptions
     raws = []
     segmenter = Segmenter(window_size=window_size_s, window_overlap=0.5, cutoff_length=2.5)
-    for subject_id, raw in enumerate(dataset):
-        x = segmenter.segment(raw, drop_artifacts=True)
+    for i, raw in enumerate(dataset):
+        x = segmenter.segment(raw, descriptions[i]['disorder'], event_mapping)
         # drop artifacts and ignored if keep_nonartifacts = True, and annotated according to descriptions (disorder or open/closed eyes rest)
-        if keep_nonartifacts:
-            x = x.drop(x.metadata['target'] != 'nonartifact')
-            annot_from_events = mne.annotations_from_events(events=x.events, event_desc={1:event_mapping[disorder]}, sfreq=x.info['sfreq'])
-        else:
-            annot_from_events = mne.annotations_from_events(events=x.events, event_desc=event_mapping, sfreq=x.info['sfreq'])
+        # if drop_artifacts:
+            # x = x.drop(x.metadata['target'] != 'nonartifact')
+            # x.events[:,2] = disorder
+        annot_from_events = mne.annotations_from_events(events=x.events, event_desc=reverse_event_mapping, sfreq=x.info['sfreq'])
         duration_per_event = [x.times[-1]+x.times[1]]
         annot_from_events.duration = np.array(duration_per_event * len(x.events))
         raws += [raw.set_annotations(annot_from_events)]

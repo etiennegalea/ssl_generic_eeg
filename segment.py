@@ -10,6 +10,7 @@
     segments_mapped = _map_artifacts(mne.Raw, segments, windowSize=WINDOW_SIZE, cutoffLength=CUTOFF_LENGTH)
  """
 
+from re import M
 import mne
 import numpy as np
 import pandas as pd
@@ -85,9 +86,26 @@ class Segmenter:
         mapped_segments._metadata = self._segment_metadata(raw, mapped_segments.events)
 
         return mapped_segments
-        
 
-    def segment(self, raw, drop_artifacts=False):
+
+    def _apply_custom_annot(self, raw, segments, custom_annot, event_mapping):
+        # replace artifact annotations with custom annotations
+        segments.event_id = event_mapping
+        segments.events[:, 2] = custom_annot
+        # switch keys with values and look up index to update target
+        reverse_event_mapping = {v:k for k,v in event_mapping.items()}
+        segments.metadata['target'] = reverse_event_mapping[custom_annot]
+        # create new Epochs with custom annotations
+        new_segments = mne.Epochs(
+            raw, segments.events, event_id=event_mapping, preload=True,
+            tmin=0, tmax=self.window_size - 1 / raw.info['sfreq'], 
+            metadata=segments.metadata, baseline=None, verbose=0, on_missing='ignore'
+        )
+
+        return new_segments
+
+
+    def segment(self, raw, custom_annotation=None, event_mapping=None):
         sfreq = raw.info["sfreq"]
         # Epoch length in timepoints/samples
         epoch_length_timepoints = sfreq * self.window_size
@@ -112,13 +130,11 @@ class Segmenter:
 
         mapped_segments = self._map_artifacts(raw, segments)
 
-        if self.descriptions is not None:
-            mapped_segments = self._attach_descriptions(mapped_segments)
-        
+        if custom_annotation is not None:
+            clean_segments = mapped_segments.drop(mapped_segments.metadata['target'] != 'nonartifact')
+            mapped_segments = self._apply_custom_annot(raw, clean_segments, custom_annotation, event_mapping)
+            
         return mapped_segments
-
-    def _attach_descriptions(self, mapped_segments):
-        mapped_segments
 
 
 
