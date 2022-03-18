@@ -27,11 +27,11 @@ class Plot:
         self.metadata_string = metadata_string
         self.date = hf.get_datetime(dateonly=False)
 
-    def _plot(self, figure, title, _title=''):
+    def _plot(self, figure, title, _title='', format='eps'):
         hf.check_dir(f'plots/{self.dataset_name}')
         # save fig
         if self.save:
-            figure.savefig(f'plots/{self.dataset_name}/{self.date}_{title+_title}_{self.metadata_string}.eps', format='eps')
+            figure.savefig(f'plots/{self.dataset_name}/{self.date}_{title+_title}_{self.metadata_string}.eps', format=format)
         # show fig
         if self.show:
             figure.show()
@@ -173,7 +173,7 @@ class Plot:
         print(':: plotting 3D UMAP... ', end='')
         umap_3d = UMAP(n_components=3, init='random', random_state=0)
         proj_3d = umap_3d.fit_transform(X)
-        
+
         series = pd.DataFrame(y, columns=['annots'])
 
         # if annotating feature space with descriptions instead
@@ -302,6 +302,6 @@ class Plot:
         plt.plot(raw_space, raw_train_scores_avg, color='r', label='Raw Training Scores')
         plt.legend(loc="best")
 
-        self._plot(plt, 'logit_learning_curves')
+        self._plot(plt, 'logit_learning_curves', format='jpg')
 
         print('Done')
