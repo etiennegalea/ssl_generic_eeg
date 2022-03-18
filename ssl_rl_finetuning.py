@@ -604,10 +604,17 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s,
     # shuffle raw_paths and descriptions
     from sklearn.utils import shuffle
     raws, descriptions = shuffle(raws, descriptions)
-    
+
+    # limit number of instances to min of all classes (for balanced dataset)
+    n_classes = len(np.unique([record['disorder'] for record in descriptions]))
+    counts = [0 for i in range(n_classes)]
+    for x in descriptions:
+        counts[x['disorder']] += 1
+    limiter = np.min(counts)
+
     # limiter
-    raws = raws[:120]
-    descriptions = descriptions[:120]
+    raws = raws[:limiter]
+    descriptions = descriptions[:limiter]
 
     # preprocess dataset
     dataset = preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs)
