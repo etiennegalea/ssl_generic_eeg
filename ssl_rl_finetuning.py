@@ -217,7 +217,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             scoring=scoring,
             n_jobs=-1,
             # train_sizes = np.linspace(0.00001,1,20),
-            train_sizes = hf.factored_space(cv_train_size),
+            train_sizes = hf.factored_space(cv_train_size, 10),
             shuffle=True
         )
 
@@ -344,7 +344,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             scoring=scoring,
             n_jobs=-1,
             # train_sizes = np.linspace(0.00001,1,40),
-            train_sizes = hf.factored_space(cv_train_size),
+            train_sizes = hf.factored_space(cv_train_size, 10),
             shuffle=True
         )
 
@@ -576,8 +576,8 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s,
     print(':: loading SPACE/BAMBI data')
 
     # space_bambi directory
-    data_dir = './data/SPACE_BAMBI_2channels/'
-    # data_dir = '/media/maligan/My Passport/msc_thesis/data/SPACE_BAMBI_2channels/'
+    # data_dir = './data/SPACE_BAMBI_2channels/'
+    data_dir = '/media/maligan/My Passport/msc_thesis/data/SPACE_BAMBI_2channels/'
 
     print(f'{len(os.listdir(data_dir))} files found')
     raws, descriptions = [], []
@@ -606,8 +606,8 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s,
     raws, descriptions = shuffle(raws, descriptions)
     
     # limiter
-    # raws = raws[:25]
-    # descriptions = descriptions[:25]
+    raws = raws[:120]
+    descriptions = descriptions[:120]
 
     # preprocess dataset
     dataset = preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs)

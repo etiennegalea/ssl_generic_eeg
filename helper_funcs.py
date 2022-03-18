@@ -137,9 +137,9 @@ class HelperFuncs():
         return space
 
     # check factor of 10 for space
-    def factored_space(n):
+    def factored_space(n, init_factor=1):
         arr = []
-        factor = 1
+        factor = init_factor
 
         while factor < n:
             arr += [factor]
