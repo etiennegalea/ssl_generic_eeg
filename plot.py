@@ -31,7 +31,7 @@ class Plot:
         hf.check_dir(f'plots/{self.dataset_name}')
         # save fig
         if self.save:
-            figure.savefig(f'plots/{self.dataset_name}/{self.date}_{title+_title}_{self.metadata_string}.png')
+            figure.savefig(f'plots/{self.dataset_name}/{self.date}_{title+_title}_{self.metadata_string}.eps', format='eps')
         # show fig
         if self.show:
             figure.show()
@@ -90,7 +90,7 @@ class Plot:
         
         n_stages = len(annotations)
 
-        fig, ax = plt.subplots(figsize=(20,20))
+        fig, ax = plt.subplots()
         colors = cm.get_cmap('plasma', n_stages)(range(n_stages))
         for i, stage in enumerate(annotations):
             mask = y == i
@@ -112,7 +112,7 @@ class Plot:
 
         n_stages = len(annotations)
 
-        fig, ax = plt.subplots(figsize=(20,20))
+        fig, ax = plt.subplots()
         colors = cm.get_cmap('plasma', n_stages)(range(n_stages))
         for i, stage in enumerate(annotations):
             mask = y == i
@@ -133,7 +133,7 @@ class Plot:
 
         n_stages = len(annotations)
 
-        fig, ax = plt.subplots(figsize=(20,20))
+        fig, ax = plt.subplots()
         colors = cm.get_cmap('plasma', n_stages)(range(n_stages))
         # if annotating feature space with descriptions instead
         if len(descriptions) > 0 or mapping is not None:
