@@ -577,8 +577,8 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s,
     print(':: loading SPACE/BAMBI data')
 
     # space_bambi directory
-    # data_dir = './data/SPACE_BAMBI_2channels/'
-    data_dir = '/media/maligan/My Passport/msc_thesis/data/SPACE_BAMBI_2channels/'
+    data_dir = './data/SPACE_BAMBI_2channels/'
+    # data_dir = '/media/maligan/My Passport/msc_thesis/data/SPACE_BAMBI_2channels/'
 
     print(f'{len(os.listdir(data_dir))} files found')
     descriptions = []
