@@ -116,10 +116,10 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             windows_dataset = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
             annotations = ['abnormal', 'normal']
         elif dataset_name == 'space_bambi':
-            annotations = ['artifact', 'non-artifact', 'ignored']
-            mapping = ['healthy', 'epilepsy', 'ASD']
-            # mapping = ['open', 'closed']
-            windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s, window_size_samples, event_mapping={v:k for k,v in enumerate(mapping)}, drop_artifacts=True)
+            # annotations = ['artifact', 'non-artifact', 'ignored']
+            # annotations = ['open', 'closed']
+            annotations = ['healthy', 'epilepsy', 'ASD']
+            windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s, window_size_samples, event_mapping={v:k for k,v in enumerate(annotations)}, drop_artifacts=True)
         elif dataset_name == 'scopolamine':
             windows_dataset = load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
             annotations = ['M01', 'M05', 'M11']
@@ -305,24 +305,24 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
     ### Visualizing clusters
     # p.plot_PCA(X, y, annotations)
     # p.plot_TSNE(X, y, annotations)
-    p.plot_UMAP(X, y, annotations, mapping, desc)
+    p.plot_UMAP(X, y, annotations)
     # if connectivity_plot:
     #     p.plot_UMAP_connectivity(X)
     # if edge_bundling_plot:
     #     p.plot_UMAP_connectivity(X, edge_bundling=True)
-    p.plot_UMAP_3d(X, y, annotations, mapping, desc)
+    p.plot_UMAP_3d(X, y, annotations)
 
 
     # plotting with raw data (not embeddings)
     p_fs = Plot('RAW_'+dataset_name, metadata_string, show=show_plots)
     # p_fs.plot_PCA(X_raw, y_raw, annotations)
     # p_fs.plot_TSNE(X_raw, y_raw, annotations)
-    p_fs.plot_UMAP(X_raw, y_raw, annotations, mapping, desc)
+    p_fs.plot_UMAP(X_raw, y_raw, annotations)
     # if connectivity_plot:
     #     p_fs.plot_UMAP_connectivity(X_raw)
     # if edge_bundling_plot:
     #     p_fs.plot_UMAP_connectivity(X_raw, edge_bundling=True)
-    p_fs.plot_UMAP_3d(X_raw, y_raw, annotations, mapping, desc)
+    p_fs.plot_UMAP_3d(X_raw, y_raw, annotations)
 
 
 

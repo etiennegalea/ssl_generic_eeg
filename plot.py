@@ -90,7 +90,7 @@ class Plot:
         
         n_stages = len(annotations)
 
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=(20,20))
         colors = cm.get_cmap('plasma', n_stages)(range(n_stages))
         for i, stage in enumerate(annotations):
             mask = y == i
@@ -112,7 +112,7 @@ class Plot:
 
         n_stages = len(annotations)
 
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=(20,20))
         colors = cm.get_cmap('plasma', n_stages)(range(n_stages))
         for i, stage in enumerate(annotations):
             mask = y == i
@@ -126,17 +126,17 @@ class Plot:
         print('Done')
 
 
-    def plot_UMAP(self, X, y, annotations, mapping, descriptions=[]):
+    def plot_UMAP(self, X, y, annotations, mapping=None, descriptions=[]):
         print(':: plotting UMAP... ', end='')
         _umap = umap.UMAP(n_neighbors=15)
         umap_components = _umap.fit_transform(X)
 
         n_stages = len(annotations)
 
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=(20,20))
         colors = cm.get_cmap('plasma', n_stages)(range(n_stages))
         # if annotating feature space with descriptions instead
-        if len(descriptions) > 0:
+        if len(descriptions) > 0 or mapping is not None:
             annotations = mapping
             y = descriptions
         for i, stage in enumerate(annotations):
@@ -169,14 +169,14 @@ class Plot:
 
 
     # 3D UMAP plot (plotly)
-    def plot_UMAP_3d(self, X, y, annotations, mapping, descriptions=[]):
+    def plot_UMAP_3d(self, X, y, annotations, mapping=None, descriptions=[]):
         print(':: plotting 3D UMAP... ', end='')
         umap_3d = UMAP(n_components=3, init='random', random_state=0)
         proj_3d = umap_3d.fit_transform(X)
         map = {k:v for k,v in enumerate(mapping)}
 
         # if annotating feature space with descriptions instead
-        if len(descriptions) > 0:
+        if len(descriptions) > 0 or mapping is not None:
             annotations = mapping
             y = descriptions
             
