@@ -620,6 +620,7 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s,
             new_descriptions += [descriptions[i]]
         counts[descriptions[i]['disorder']] += 1
     descriptions = new_descriptions
+    raws = new_raws
 
     # preprocess dataset
     dataset = preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs)
