@@ -173,15 +173,16 @@ class Plot:
         print(':: plotting 3D UMAP... ', end='')
         umap_3d = UMAP(n_components=3, init='random', random_state=0)
         proj_3d = umap_3d.fit_transform(X)
-        map = {k:v for k,v in enumerate(mapping)}
+        
+        series = pd.DataFrame(y, columns=['annots'])
 
         # if annotating feature space with descriptions instead
         if len(descriptions) > 0 or mapping is not None:
+            map = {k:v for k,v in enumerate(mapping)}
             annotations = mapping
             y = descriptions
+            series['labels'] = series['annots'].map(map)
             
-        series = pd.DataFrame(y, columns=['annots'])
-        series['labels'] = series['annots'].map(map)
 
         fig_3d = px.scatter_3d(
             proj_3d,
