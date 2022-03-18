@@ -374,6 +374,7 @@ def main(dataset_name, subject_size_percent, random_state, n_jobs, window_size_s
         windows_dataset = load_windowed_data(preprocessed_data)
     else:
         windows_dataset, subjects = load_sleep_staging_windowed_dataset(subject_size_percent, n_jobs, window_size_samples, low_cut_hz, high_cut_hz, sfreq)
+        annotations = ['W', 'N1', 'N2', 'N3', 'R']
         # windows_dataset, subjects = load_space_bambi_raws(dataset_path, subject_size_percent, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
         # windows_dataset, subjects = load_abnormal_raws(dataset_path, subject_size_percent, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
 
@@ -505,8 +506,8 @@ def main(dataset_name, subject_size_percent, random_state, n_jobs, window_size_s
     p.plot_confusion_matrix(conf_matrix)
 
     # classification report
-    class_report = classification_report(y_true, y_pred)
-    print(classification_report(y_true, y_pred))
+    class_report = classification_report(y_true, y_pred, labels=annotations)
+    print(classification_report(y_true, y_pred, labels=annotations))
     # save report
     dir = 'classification_reports/pretrained/'
     hf.check_dir(dir)
