@@ -98,7 +98,7 @@ class Plot:
                     color=colors[i], label=stage)
         ax.legend()
 
-        ax.set_title('PCA')
+        ax.set_title(f'PCA of {self.dataset_name}')
 
         self._plot(plt, 'PCA')
         print('Done')
@@ -120,7 +120,7 @@ class Plot:
                     color=colors[i], label=stage)
         ax.legend()
 
-        ax.set_title('TSNE')
+        ax.set_title(f't-SNE of {self.dataset_name}')
 
         self._plot(plt, 'TSNE')
         print('Done')
@@ -145,7 +145,7 @@ class Plot:
             color=colors[i], label=stage)
         ax.legend()
 
-        ax.set_title('UMAP')
+        ax.set_title(f'UMAP of {self.dataset_name}')
 
         self._plot(plt, 'UMAP')
         print('Done')
@@ -155,13 +155,13 @@ class Plot:
     # https://umap-learn.readthedocs.io/en/latest/plotting.html
     def plot_UMAP_connectivity(self, X, edge_bundling=False):
         print(':: plotting UMAP with connectivity... ', end='')
-        title = 'UMAP_connectivity'
+        title = f'Connectivity UMAP of {self.dataset_name}'
         mapping = umap.UMAP(n_components=2, init='random').fit(X)
 
         if not edge_bundling:
             umap.plot.connectivity(mapping, show_points=True)
         else:
-            title += '_edge_bundled'
+            title += '(edge bundled)'
             umap.plot.connectivity(mapping, edge_bundling='hammer') # bundles edges
             
         self._plot(plt, title)
@@ -250,7 +250,7 @@ class Plot:
         ax.set_xlabel("Training examples")
         ax.set_ylabel(scoring)
 
-        ax.set_title(f'Fully-Supervised and Self-Supervised Logistic Regression scores per Training Example for {dataset_name} dataset')
+        ax.set_title(f'Learning curves of a Fully-Supervised and Self-Supervised Logistic Regression scores per Training Example for {dataset_name} dataset')
         # plt.plot(ssl_train_sizes, ssl_train_scores_mean, color='r', label='SSL Training Score')
         plt.plot(ssl_train_sizes, ssl_test_scores_mean, '-', color='r', label='SSL')
         # plt.plot(raw_train_sizes, raw_train_scores_mean, color='g', label='FS Training Score')
@@ -297,7 +297,7 @@ class Plot:
         ax.set_xlabel("Training examples")
         ax.set_ylabel("Accuracy")
 
-        ax.set_title(f'Fully-Supervised and Self-Supervised Logistic Regression scores per Training Example')
+        ax.set_title(f'Learning curves of a Fully-Supervised and Self-Supervised Logistic Regression scores per Training Example')
         plt.plot(ssl_space, ssl_train_scores_avg, color='g', label='SSL Training Scores')
         plt.plot(raw_space, raw_train_scores_avg, color='r', label='Raw Training Scores')
         plt.legend(loc="best")
