@@ -53,7 +53,7 @@ m05 = '/media/maligan/My Passport/msc_thesis/data/scopolamine/M05/'
 m11 = '/media/maligan/My Passport/msc_thesis/data/scopolamine/M11/'
 
 dataset, descriptions = [], []
-info = mne.create_info(ch_names=['Fpz-cz', 'Pz-Oz'], ch_types=['eeg']*2, sfreq=100)
+info = mne.create_info(ch_names=['Fpz-cz', 'Pz-Oz'], ch_types=['eeg']*2, sfreq=1012)
 
 dataset, descriptions = load_mats(m01, info, 'M01', dataset, descriptions)
 dataset, descriptions = load_mats(m05, info, 'M05', dataset, descriptions)

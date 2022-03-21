@@ -705,12 +705,12 @@ def load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sa
     print(':: loading SCOPOLAMINE data')
 
     # 11 measurements times from 0.5 hrs to 8.5 hrs after Scopolamine (or placebo) administration
-    m01 = 'data/scopolamine_preprocessed/M01/'
-    # m01 = '/media/maligan/My Passport/msc_thesis/data/scopolamine_preprocessed/M01/'
-    m05 = 'data/scopolamine_preprocessed/M05/'
-    # m05 = '/media/maligan/My Passport/msc_thesis/data/scopolamine_preprocessed/M05/'
-    m11 = 'data/scopolamine_preprocessed/M11/'
-    # m11 = '/media/maligan/My Passport/msc_thesis/data/scopolamine_preprocessed/M11/'
+    m01 = 'data/scopolamine_converted/M01/'
+    # m01 = '/media/maligan/My Passport/msc_thesis/data/scopolamine_converted/M01/'
+    m05 = 'data/scopolamine_converted/M05/'
+    # m05 = '/media/maligan/My Passport/msc_thesis/data/scopolamine_converted/M05/'
+    m11 = 'data/scopolamine_converted/M11/'
+    # m11 = '/media/maligan/My Passport/msc_thesis/data/scopolamine_converted/M11/'
 
     dataset, descriptions = [], []
     info = mne.create_info(ch_names=['Fpz-cz', 'Pz-Oz'], ch_types=['eeg']*2, sfreq=1012)
