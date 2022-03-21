@@ -696,8 +696,8 @@ def load_scop_raws(dir_path, info, classification, dataset, descriptions):
         desc += [{'subject': subject, 'recording': recording, 'treatment_period': treatment_period, 'raw': dir_path+path}]
 
         # limiter
-        # if i == 30:
-        #     break
+        if i == 30:
+            break
 
     dataset += raws
     descriptions += desc
