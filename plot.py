@@ -40,6 +40,7 @@ class Plot:
     # Extract loss and balanced accuracy values for plotting from history object
     def plot_acc(self, clf_history):
         print(':: plotting accuracy per epoch... ', end='')
+        # Extract loss and balanced accuracy values for plotting from history object
         df = pd.DataFrame(clf_history)
 
         df['train_acc'] *= 100
@@ -52,27 +53,36 @@ class Plot:
 
         plt.style.use('seaborn-talk')
 
-        fig, ax1 = plt.subplots(figsize=(16, 6))
-        ax2 = ax1.twinx()
+        fig, ax = plt.subplots(2, 1, figsize=(12, 10))
+
         for y1, y2, style, marker in zip(ys1, ys2, styles, markers):
-            ax1.plot(df['epoch'], df[y1], ls=style, marker=marker, ms=7,
+            ax[0].plot(df['epoch'], df[y1], ls=style, marker=marker, ms=7,
                     c='tab:blue', label=y1)
-            ax2.plot(df['epoch'], df[y2], ls=style, marker=marker, ms=7,
+            lines1, labels1 = ax[0].get_legend_handles_labels()
+
+            ax[0].tick_params(axis='y', labelcolor='tab:blue')
+            ax[0].set_ylabel('Loss', color='tab:blue')
+            ax[0].set_xlabel('Epoch')
+            ax[0].legend(lines1, labels1)
+
+        for y1, y2, style, marker in zip(ys1, ys2, styles, markers):
+            ax[1].grid()
+            ax[1].plot(df['epoch'], df[y2], ls=style, marker=marker, ms=7,
                     c='tab:orange', label=y2)
 
-        ax1.tick_params(axis='y', labelcolor='tab:blue')
-        ax1.set_ylabel('Loss', color='tab:blue')
-        ax2.tick_params(axis='y', labelcolor='tab:orange')
-        ax2.set_ylabel('Accuracy [%]', color='tab:orange')
-        ax1.set_xlabel('Epoch')
+            lines2, labels2 = ax[1].get_legend_handles_labels()
 
-        lines1, labels1 = ax1.get_legend_handles_labels()
-        lines2, labels2 = ax2.get_legend_handles_labels()
-        ax2.legend(lines1 + lines2, labels1 + labels2)
+            ax[1].tick_params(axis='y', labelcolor='tab:orange')
+            ax[1].set_ylabel('Accuracy [%]', color='tab:orange')
+            ax[1].set_xlabel('Epoch')
+            ax[1].legend(lines2, labels2)
 
+
+        plt.suptitle('Pretext task performance for pretrained sleep staging model')
         plt.tight_layout()
         self._plot(plt, 'train_loss_acc')
         print('Done')
+
 
 
     def plot_confusion_matrix(self, conf_matrix, _title=''):
