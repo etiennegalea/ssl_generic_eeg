@@ -17,26 +17,24 @@ def load_mats(path, info, classification, dataset, descriptions):
     for i, mat in enumerate(tqdm(mats)):
         print(f'mat file: {mat}')
         # select columns 3 and 4 (Fpz-Cz, and Pz-Oz respectively) and convert to microvolts
-        x = loadmat(path + mat)['RawSignal'][:, [2,3]].T / 1000000
+        x = loadmat(path + mat)['RawSignal'][:, [2,3]].T / 1000000 # 1e+6
         raw = mne.io.RawArray(x, info)
 
         raw = raw.set_annotations(mne.Annotations(onset=[0], duration=raw.times.max(), description=[classification]))
-        # try:
-        mat = mat.split('.mat')[0]
 
+        # extract file name only
+        mat = mat.split('.mat')[0]
 
         # preprocess
         raw = raw.resample(100)   # resample
         raw = raw.filter(l_freq=0.5, h_freq=30, n_jobs=1)    # filtering
 
-
         print(f':: {classification} ~ {mat}')
         to_export = f'/media/maligan/My Passport/msc_thesis/data/scopolamine_preprocessed/{classification}/{mat}.fif'
         print(f':: {to_export}')
-        raw.save(to_export)
-        # except:
-        # errors.append(raw_name)
+        raw.save(to_export, overwrite=True)
 
+        # errors.append(raw_name)
 
     dataset += raws
     descriptions += desc
@@ -55,7 +53,7 @@ m05 = '/media/maligan/My Passport/msc_thesis/data/scopolamine/M05/'
 m11 = '/media/maligan/My Passport/msc_thesis/data/scopolamine/M11/'
 
 dataset, descriptions = [], []
-info = mne.create_info(ch_names=['Fpz-cz', 'Pz-Oz'], ch_types=['eeg']*2, sfreq=1012)
+info = mne.create_info(ch_names=['Fpz-cz', 'Pz-Oz'], ch_types=['eeg']*2, sfreq=100)
 
 dataset, descriptions = load_mats(m01, info, 'M01', dataset, descriptions)
 dataset, descriptions = load_mats(m05, info, 'M05', dataset, descriptions)

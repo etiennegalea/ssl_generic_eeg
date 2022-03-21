@@ -52,8 +52,8 @@ from segment_tuar import Segmenter_TUAR
 
 ### Load model
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='space_bambi', help='Dataset for downstream task: \
-    "space_bambi", "sleep_staging", "tuh_abnormal", "scopolamine", "white_noise", "bci".')
+@click.option('--dataset_name', '--dataset', '-n', default='scopolamine', help='Dataset for downstream task: \
+    "space_bambi", "sleep_staging", "tuh_abnormal", "scopolamine", "white_noise", "bci, "tuar".')
 @click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
 # @click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
 @click.option('--random_state', default=87, help='Set a static random state so that the same result is generated everytime.')
@@ -79,6 +79,8 @@ from segment_tuar import Segmenter_TUAR
 def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cut_hz, high_cut_hz, sfreq, lr, batch_size, n_channels, connectivity_plot, edge_bundling_plot, plot_heavy, show_plots, load_feature_vectors, load_latest_model, fully_supervised, cv):
     print(':: STARTING MAIN ::')
     
+    # clustering according to description (init)
+    desc = None
     # print local parameters
     # set device to 'cuda' or 'cpu'
     device = hf.enable_cuda()
@@ -105,29 +107,30 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
 
     # DOWNSTREAM TASK - FINE TUNING)
     if load_feature_vectors is None:
+        
 
         if dataset_name == 'sleep_staging':
-            windows_dataset = load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq)
             annotations = ['W', 'N1', 'N2', 'N3', 'R']
+            windows_dataset = load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq)
         elif dataset_name == 'bci':
-            windows_dataset = load_bci_data(subject_size, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
             annotations = ['T0', 'T1', 'T2']
+            windows_dataset = load_bci_data(subject_size, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         elif dataset_name == 'tuh_abnormal':
-            windows_dataset = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
             annotations = ['abnormal', 'normal']
+            windows_dataset = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         elif dataset_name == 'space_bambi':
             # annotations = ['artifact', 'non-artifact', 'ignored']
             # annotations = ['open', 'closed']
+            # desc = 'disorder'
             annotations = ['healthy', 'epilepsy', 'ASD']
             windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s, window_size_samples, event_mapping={v:k for k,v in enumerate(annotations)}, drop_artifacts=True)
         elif dataset_name == 'scopolamine':
-            windows_dataset = load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
             annotations = ['M01', 'M05', 'M11']
+            windows_dataset = load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         elif dataset_name == 'white_noise':
-            windows_dataset = load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
             annotations = ['abnormal', 'normal', 'white_noise']
+            windows_dataset = load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         elif dataset_name == 'tuar':
-            windows_dataset = load_tuar_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
             # annotations = ['eyem', 'chew', 'shiv', 'musc', 'elec']
             # annotations = [
                 # 'null', 'spsw', 'gped', 'pled', 'eyeb', 'artf','bckg', 'seiz', 'fnsz', 'gnsz', 'spsz', 'cpsz','absz',
@@ -140,6 +143,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             #     'musc_elec', 'shiv'
             # ]
             annotations = ['artifact', 'non-artifact', 'ignored']
+            windows_dataset = load_tuar_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
 
 
         # print all parameter vars
@@ -185,7 +189,8 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
                 # make a copy of the vectors WITHOUT passing them through the pretrained model
                 raw_vectors = [batch_x.to(device).cpu().numpy() for batch_x, _, _ in loader]
             # descriptions values according to dataset in use: CHANGE MANUALLY
-            descriptions[name] = split.get_metadata()['disorder'].values
+            if desc is not None:
+                descriptions[name] = split.get_metadata()[desc].values  
             data[name] = (np.concatenate(feats), split.get_metadata()['target'].values)
             # concatenate channels per window such that you will have 10s windows
             raw_data[name] = ([np.concatenate(x.T) for x in np.concatenate(raw_vectors)], split.get_metadata()['target'].values)
@@ -193,7 +198,8 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         # combine all vectors (X) and labels (y) from DATA sets
         X = np.concatenate([v[0] for k, v in data.items()])
         y = np.concatenate([v[1] for k, v in data.items()])
-        desc = np.concatenate([v for k, v in descriptions.items()])
+        if desc is not None:
+            desc = np.concatenate([v for k, v in descriptions.items()])
 
         # combine all vectors (X) and labels (y) from RAW_DATA sets
         X_raw = np.concatenate([v[0] for k, v in raw_data.items()])
@@ -699,12 +705,12 @@ def load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sa
     print(':: loading SCOPOLAMINE data')
 
     # 11 measurements times from 0.5 hrs to 8.5 hrs after Scopolamine (or placebo) administration
-    # m01 = 'data/scopolamine/M01/'
-    m01 = '/media/maligan/My Passport/msc_thesis/data/scopolamine_converted/M01/'
-    # m05 = 'data/scopolamine_converted/M05/'
-    m05 = '/media/maligan/My Passport/msc_thesis/data/scopolamine_converted/M05/'
-    # m11 = 'data/scopolamine_converted/M11/'
-    m11 = '/media/maligan/My Passport/msc_thesis/data/scopolamine_converted/M11/'
+    m01 = 'data/scopolamine_preprocessed/M01/'
+    # m01 = '/media/maligan/My Passport/msc_thesis/data/scopolamine_preprocessed/M01/'
+    m05 = 'data/scopolamine_preprocessed/M05/'
+    # m05 = '/media/maligan/My Passport/msc_thesis/data/scopolamine_preprocessed/M05/'
+    m11 = 'data/scopolamine_preprocessed/M11/'
+    # m11 = '/media/maligan/My Passport/msc_thesis/data/scopolamine_preprocessed/M11/'
 
     dataset, descriptions = [], []
     info = mne.create_info(ch_names=['Fpz-cz', 'Pz-Oz'], ch_types=['eeg']*2, sfreq=1012)
@@ -716,7 +722,7 @@ def load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sa
 
 
     # preprocess dataset
-    dataset = preprocess_raws(dataset, sfreq, low_cut_hz, high_cut_hz, n_jobs)
+    # dataset = preprocess_raws(dataset, sfreq, low_cut_hz, high_cut_hz, n_jobs)
 
     mapping = {
         'm01': 0,
@@ -896,8 +902,8 @@ def load_generated_noisy_signals(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_
 def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
     print(':: loading TUH abnormal data + white noise')
 
-    data_dir = 'data/tuh_abnormal_data/eval/'
-    # data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
+    # data_dir = 'data/tuh_abnormal_data/eval/'
+    data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
 
     # build data dictionary
     annotations = {}
