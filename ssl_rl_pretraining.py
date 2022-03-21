@@ -430,7 +430,7 @@ def fetch_dataset_path(dataset_name):
 
 @click.command()
 @click.option('--dataset_name', '--dataset', '-n', default='sleep_staging', help='Dataset to be pretrained (sleep_staging, tuh_abnormal, space_bambi_artifacts, space_bambi_asd).')
-@click.option('--subject_size_percent', default=50, help='Percentage of dataset (1-100)')
+@click.option('--subject_size_percent', default=5, help='Percentage of dataset (1-100)')
 @click.option('--random_state', default=87, help='Set a static random state so that the same result is generated everytime.')
 @click.option('--n_jobs', default=1, help='Number of subprocesses to run.')
 @click.option('--window_size_s', default=5, help='Window sizes in seconds.')
@@ -620,7 +620,7 @@ def main(dataset_name, subject_size_percent, random_state, n_jobs, window_size_s
     p.plot_confusion_matrix(conf_matrix)
 
     # classification report
-    class_report = classification_report(y_true, y_pred, labels=annotations)
+    class_report = classification_report(y_true, y_pred)
     print(classification_report(y_true, y_pred, labels=annotations))
     # save report
     dir = './classification_reports/pretrained/'

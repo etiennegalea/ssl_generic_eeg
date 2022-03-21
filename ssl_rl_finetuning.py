@@ -309,25 +309,25 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
     # clean_X, clean_y = np.array(clean_X), np.array(clean_y)
 
     ### Visualizing clusters
-    # p.plot_PCA(X, y, annotations)
-    # p.plot_TSNE(X, y, annotations)
+    p.plot_PCA(X, y, annotations)
+    p.plot_TSNE(X, y, annotations)
     p.plot_UMAP(X, y, annotations)
-    # if connectivity_plot:
-    #     p.plot_UMAP_connectivity(X)
-    # if edge_bundling_plot:
-    #     p.plot_UMAP_connectivity(X, edge_bundling=True)
+    if connectivity_plot:
+        p.plot_UMAP_connectivity(X)
+    if edge_bundling_plot:
+        p.plot_UMAP_connectivity(X, edge_bundling=True)
     p.plot_UMAP_3d(X, y, annotations)
 
 
     # plotting with raw data (not embeddings)
     p_fs = Plot('RAW_'+dataset_name, metadata_string, show=show_plots)
-    # p_fs.plot_PCA(X_raw, y_raw, annotations)
-    # p_fs.plot_TSNE(X_raw, y_raw, annotations)
+    p_fs.plot_PCA(X_raw, y_raw, annotations)
+    p_fs.plot_TSNE(X_raw, y_raw, annotations)
     p_fs.plot_UMAP(X_raw, y_raw, annotations)
-    # if connectivity_plot:
-    #     p_fs.plot_UMAP_connectivity(X_raw)
-    # if edge_bundling_plot:
-    #     p_fs.plot_UMAP_connectivity(X_raw, edge_bundling=True)
+    if connectivity_plot:
+        p_fs.plot_UMAP_connectivity(X_raw)
+    if edge_bundling_plot:
+        p_fs.plot_UMAP_connectivity(X_raw, edge_bundling=True)
     p_fs.plot_UMAP_3d(X_raw, y_raw, annotations)
 
 
