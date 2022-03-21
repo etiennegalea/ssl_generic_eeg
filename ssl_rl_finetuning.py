@@ -223,8 +223,8 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             cv=cv,
             scoring=scoring,
             n_jobs=-1,
-            # train_sizes = np.linspace(0.00001,1,20),
-            train_sizes = hf.factored_space(cv_train_size, 10),
+            train_sizes = np.linspace(0.00001,1,20),
+            # train_sizes = hf.factored_space(cv_train_size, 10),
             shuffle=True
         )
 
@@ -350,8 +350,8 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             cv=cv,
             scoring=scoring,
             n_jobs=-1,
-            # train_sizes = np.linspace(0.00001,1,40),
-            train_sizes = hf.factored_space(cv_train_size, 10),
+            train_sizes = np.linspace(0.00001,1,20),
+            # train_sizes = hf.factored_space(cv_train_size, 10),
             shuffle=True
         )
 
