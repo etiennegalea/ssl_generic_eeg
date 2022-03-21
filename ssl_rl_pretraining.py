@@ -315,8 +315,8 @@ def load_space_bambi_raws_asd(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_siz
     print(f':: loading SPACE/BAMBI data for: {event_mapping}')
 
     # space_bambi directory
-    # data_dir = './data/SPACE_BAMBI_2channels/'
-    data_dir = '/media/maligan/My Passport/msc_thesis/data/SPACE_BAMBI_2channels/'
+    data_dir = './data/SPACE_BAMBI_2channels/'
+    # data_dir = '/media/maligan/My Passport/msc_thesis/data/SPACE_BAMBI_2channels/'
 
     print(f'{len(os.listdir(data_dir))} files found')
     raws, descriptions = [], []
@@ -494,7 +494,8 @@ def main(dataset_name, subject_size_percent, random_state, n_jobs, window_size_s
         metadata_string = f'{dataset_name}_{window_size_s}s_windows_{subjects}%_subjects_{device}_{n_epochs}_epochs_{sfreq}hz'
 
         ### save windows
-        dir = '/home/maligan/Documents/VU/Year_2/M.Sc._Thesis_[X_400285]/my_thesis/code/ssl_thesis/data/preprocessed/'
+        dir = './data/preprocessed'
+        # dir = '/home/maligan/Documents/VU/Year_2/M.Sc._Thesis_[X_400285]/my_thesis/code/ssl_thesis/data/preprocessed/'
         hf.check_dir(dir)
         with open(f'{dir}{hf.get_datetime()}_{metadata_string}.pkl', 'wb+') as f:
             pickle.dump(windows_dataset, f)
@@ -622,7 +623,7 @@ def main(dataset_name, subject_size_percent, random_state, n_jobs, window_size_s
     class_report = classification_report(y_true, y_pred, labels=annotations)
     print(classification_report(y_true, y_pred, labels=annotations))
     # save report
-    dir = 'classification_reports/pretrained/'
+    dir = './classification_reports/pretrained/'
     hf.check_dir(dir)
     with open(f'{dir}{hf.get_datetime()}_class_report_{metadata_string}.txt', "w") as f:
         f.write(pprint.pformat(class_report, indent=4, sort_dicts=False))
