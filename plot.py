@@ -31,7 +31,7 @@ class Plot:
         hf.check_dir(f'plots/{self.dataset_name}')
         # save fig
         if self.save:
-            figure.savefig(f'plots/{self.dataset_name}/{self.date}_{title+_title}_{self.metadata_string}.eps', format=format)
+            figure.savefig(f'plots/{self.dataset_name}/{self.date}_{title+_title}_{self.metadata_string}.pdf', format=format)
         # show fig
         if self.show:
             figure.show()
@@ -302,6 +302,6 @@ class Plot:
         plt.plot(raw_space, raw_train_scores_avg, color='r', label='Raw Training Scores')
         plt.legend(loc="best")
 
-        self._plot(plt, 'logit_learning_curves', format='jpg')
+        self._plot(plt, 'logit_learning_curves')
 
         print('Done')
