@@ -120,7 +120,7 @@ def load_sleep_staging_windowed_dataset(subject_size_percent, n_jobs, window_siz
 
 
 
-def load_space_bambi_raws(dataset_path, subject_size_percent, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s):
+def load_space_bambi_raws_artifacts(dataset_path, subject_size_percent, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s):
     print(':: loading SPACE/BAMBI data')
 
     files = os.listdir(dataset_path)
@@ -179,7 +179,6 @@ def load_space_bambi_raws(dataset_path, subject_size_percent, sfreq, low_cut_hz,
     preprocess(windows_dataset, [Preprocessor(zscore)])
 
     return windows_dataset, subjects
-
 
 
 def get_file_list(x):
@@ -311,12 +310,113 @@ def load_abnormal_raws(dataset_path, subject_size_percent, sfreq, low_cut_hz, hi
 
     return windows_dataset, subjects
 
+
+def load_space_bambi_raws_asd(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s, window_size_samples, event_mapping={0: 'artifact', 1: 'non-artifact', 2:'ignore'}, drop_artifacts=False):
+    print(f':: loading SPACE/BAMBI data for: {event_mapping}')
+
+    # space_bambi directory
+    # data_dir = './data/SPACE_BAMBI_2channels/'
+    data_dir = '/media/maligan/My Passport/msc_thesis/data/SPACE_BAMBI_2channels/'
+
+    print(f'{len(os.listdir(data_dir))} files found')
+    raws, descriptions = [], []
+    for i, path in enumerate(os.listdir(data_dir)):
+        # DESCRIPTIONS
+        # ECR - eyes closed rest (0 - closed)
+        # EOR - eyes open rest (1 - open)
+        # HE - healthy (0 - HE)
+        # EP - epilepsy (1 - EP)
+        # ASD - autism spectrum disorder (2 - ASD)
+        eyes_close_open_rest = 0 if 'ECR' in path else 1
+        disorder = 2 if 'ASD' in path else 1 if 'EP' in path else 0
+        subject_id = int(path.split('.')[1][1:])
+        descriptions += [{'subject': subject_id, 'eyes_close_open_rest': eyes_close_open_rest, 'disorder': disorder, 'filename': path.split('/')[-1]}]
+
+        full_path = os.path.join(data_dir, path)
+        raws += [mne.io.read_raw_fif(full_path, preload=True)]
+
+        # limiter
+        if i == 10:
+            break
+
+    # count unique subjects
+    subjects = np.sum(np.unique([x['subject'] for x in descriptions]))
+
+
+    # shuffle raw_paths and descriptions
+    from sklearn.utils import shuffle
+    raws, descriptions = shuffle(raws, descriptions)
+
+    # limit number of instances to min of all classes (for balanced dataset)
+    if False:
+        n_classes = len(np.unique([record['disorder'] for record in descriptions]))
+        counts = [0 for i in range(n_classes)]
+        for x in descriptions:
+            counts[x['disorder']] += 1
+        limiter = np.min(counts)
+
+        # reinit counts
+        counts = [0 for i in range(n_classes)]
+        new_raws, new_descriptions = [], []
+        # load raws according to limiter
+        for i, path in enumerate(os.listdir(data_dir)):
+            if counts[descriptions[i]['disorder']] <= limiter:
+                full_path = os.path.join(data_dir, path)
+                new_raws += [raws[i]]
+                new_descriptions += [descriptions[i]]
+            counts[descriptions[i]['disorder']] += 1
+        descriptions = new_descriptions
+        raws = new_raws
+
+    # preprocess dataset
+    dataset = preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs)
+    
+    reverse_event_mapping = {v:k for k,v in event_mapping.items()}
+
+    # segment dataset recordings into windows and add descriptions
+    raws = []
+    segmenter = Segmenter(window_size=window_size_s, window_overlap=0.5, cutoff_length=2.5)
+    for i, raw in enumerate(dataset):
+        x = segmenter.segment(raw, descriptions[i]['disorder'], event_mapping)
+        # drop artifacts and ignored if keep_nonartifacts = True, and annotated according to descriptions (disorder or open/closed eyes rest)
+        # if drop_artifacts:
+            # x = x.drop(x.metadata['target'] != 'nonartifact')
+            # x.events[:,2] = disorder
+        annot_from_events = mne.annotations_from_events(events=x.events, event_desc=reverse_event_mapping, sfreq=x.info['sfreq'])
+        duration_per_event = [x.times[-1]+x.times[1]]
+        annot_from_events.duration = np.array(duration_per_event * len(x.events))
+        raws += [raw.set_annotations(annot_from_events)]
+
+
+    # # create windows from epochs and descriptions
+    ds = BaseConcatDataset([BaseDataset(raws[i], descriptions[i]) for i in range(len(descriptions))])
+
+    mapping = {
+        'healthy': 0,
+        'epilepsy': 1,
+        'ASD': 2
+    }
+
+    windows_dataset = create_windows_from_events(
+        ds, 
+        mapping = mapping,
+    )
+
+    # channel-wise zscore normalization
+    preprocess(windows_dataset, [Preprocessor(zscore)])
+
+    return windows_dataset, subjects
+
+
+
 # fetch predefined dataset paths according to dataset name
 def fetch_dataset_path(dataset_name):
     paths = {
         # 'sleep_staging': '',
         'tuh_abnormal': '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/train/',
-        'space_bambi': '/media/maligan/My Passport/msc_thesis/data/SPACE_BAMBI_2channels/',
+        'space_bambi_artifacts': '/media/maligan/My Passport/msc_thesis/data/SPACE_BAMBI_2channels/',
+        'space_bambi_asd': '/media/maligan/My Passport/msc_thesis/data/SPACE_BAMBI_2channels/',
+        
     }
 
     try: 
@@ -329,7 +429,7 @@ def fetch_dataset_path(dataset_name):
 
 
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='sleep_staging', help='Dataset to be pretrained (sleep_staging, tuh_abnormal, space_bambi).')
+@click.option('--dataset_name', '--dataset', '-n', default='space_bambi_asd', help='Dataset to be pretrained (sleep_staging, tuh_abnormal, space_bambi_artifacts, space_bambi_asd).')
 @click.option('--subject_size_percent', default=5, help='Percentage of dataset (1-100)')
 @click.option('--random_state', default=87, help='Set a static random state so that the same result is generated everytime.')
 @click.option('--n_jobs', default=1, help='Number of subprocesses to run.')
@@ -340,7 +440,7 @@ def fetch_dataset_path(dataset_name):
 @click.option('--sfreq', default=100, help='Sampling frequency of the input data.')
 # @click.option('--emb_size', default=100, help='Embedding size of the model (should correspond to sampling frequency).')
 @click.option('--lr', default=5e-3, help='Learning rate of the pretrained model.')
-@click.option('--batch_size', default=512, help='Batch size of the pretrained model.')
+@click.option('--batch_size', default=256, help='Batch size of the pretrained model.')
 @click.option('--n_epochs', default=15, help='Number of epochs while training the pretrained model.')
 @click.option('--preprocessed_data', '-d', default=None, help='Preprocessed windowed data from previous run.')
 @click.option('--accepted_bads_ratio', default=0, help='Acceptable proportion of trials with inconsistent length in a raw. \
@@ -373,10 +473,23 @@ def main(dataset_name, subject_size_percent, random_state, n_jobs, window_size_s
         print(':: loading PREPROCESSED windowed dataset: ', preprocessed_data)
         windows_dataset = load_windowed_data(preprocessed_data)
     else:
-        windows_dataset, subjects = load_sleep_staging_windowed_dataset(subject_size_percent, n_jobs, window_size_samples, low_cut_hz, high_cut_hz, sfreq)
-        annotations = ['W', 'N1', 'N2', 'N3', 'R']
-        # windows_dataset, subjects = load_space_bambi_raws(dataset_path, subject_size_percent, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
-        # windows_dataset, subjects = load_abnormal_raws(dataset_path, subject_size_percent, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
+        if dataset_name == 'sleep_staging':
+            annotations = ['W', 'N1', 'N2', 'N3', 'R']
+            windows_dataset, subjects = load_sleep_staging_windowed_dataset(subject_size_percent, n_jobs, window_size_samples, low_cut_hz, high_cut_hz, sfreq)
+        elif dataset_name == 'tuh_abnormal':
+            annotations = ['abnormal', 'normal']
+            windows_dataset = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
+        elif dataset_name == 'space_bambi_artifacts':
+            annotations = ['artifact', 'non-artifact', 'ignored']
+            windows_dataset = load_space_bambi_raws_artifacts(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s, window_size_samples, event_mapping={v:k for k,v in enumerate(annotations)}, drop_artifacts=True)
+        elif dataset_name == 'space_bambi_asd':
+            # annotations = ['open', 'closed']
+            annotations = ['healthy', 'epilepsy', 'ASD']
+            windows_dataset, subjects = load_space_bambi_raws_asd(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s, window_size_samples, event_mapping={v:k for k,v in enumerate(annotations)}, drop_artifacts=True)
+
+        
+            # windows_dataset, subjects = load_space_bambi_raws_artifacts(dataset_path, subject_size_percent, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s)
+            # windows_dataset, subjects = load_abnormal_raws(dataset_path, subject_size_percent, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
 
         metadata_string = f'{dataset_name}_{window_size_s}s_windows_{subjects}%_subjects_{device}_{n_epochs}_epochs_{sfreq}hz'
 
