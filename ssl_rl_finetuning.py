@@ -790,8 +790,8 @@ def load_scopolamine_test_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_si
 def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
     print(':: loading TUH abnormal data')
 
-    # data_dir = 'data/tuh_abnormal_data/eval/'
-    data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
+    data_dir = 'data/tuh_abnormal_data/eval/'
+    # data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
 
     # build data dictionary
     annotations = {}
@@ -906,8 +906,8 @@ def load_generated_noisy_signals(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_
 def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
     print(':: loading TUH abnormal data + white noise')
 
-    # data_dir = 'data/tuh_abnormal_data/eval/'
-    data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
+    data_dir = 'data/tuh_abnormal_data/eval/'
+    # data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
 
     # build data dictionary
     annotations = {}
@@ -1004,8 +1004,8 @@ def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size
 def load_tuar_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s):
     print(':: loading TUAR data')
 
-    # data_dir = 'data/tuar/v2_1_0/processed/'
-    data_dir = '/media/maligan/My Passport/msc_thesis/data/tuar/v2_1_0/processed/'
+    data_dir = 'data/tuar/v2_1_0/processed/'
+    # data_dir = '/media/maligan/My Passport/msc_thesis/data/tuar/v2_1_0/processed/'
     raws = []
 
     print(f'{len(os.listdir(data_dir))} files found')
