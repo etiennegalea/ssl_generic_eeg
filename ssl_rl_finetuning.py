@@ -608,25 +608,25 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s,
     from sklearn.utils import shuffle
     raws, descriptions = shuffle(raws, descriptions)
 
-    # limit number of instances to min of all classes (for balanced dataset)
-    n_classes = len(np.unique([record['disorder'] for record in descriptions]))
-    counts = [0 for i in range(n_classes)]
-    for x in descriptions:
-        counts[x['disorder']] += 1
-    limiter = np.min(counts)
+    # # limit number of instances to min of all classes (for balanced dataset)
+    # n_classes = len(np.unique([record['disorder'] for record in descriptions]))
+    # counts = [0 for i in range(n_classes)]
+    # for x in descriptions:
+    #     counts[x['disorder']] += 1
+    # limiter = np.min(counts)
 
-    # reinit counts
-    counts = [0 for i in range(n_classes)]
-    new_raws, new_descriptions = [], []
-    # load raws according to limiter
-    for i, path in enumerate(os.listdir(data_dir)):
-        if counts[descriptions[i]['disorder']] <= limiter:
-            full_path = os.path.join(data_dir, path)
-            new_raws += [raws[i]]
-            new_descriptions += [descriptions[i]]
-        counts[descriptions[i]['disorder']] += 1
-    descriptions = new_descriptions
-    raws = new_raws
+    # # reinit counts
+    # counts = [0 for i in range(n_classes)]
+    # new_raws, new_descriptions = [], []
+    # # load raws according to limiter
+    # for i, path in enumerate(os.listdir(data_dir)):
+    #     if counts[descriptions[i]['disorder']] <= limiter:
+    #         full_path = os.path.join(data_dir, path)
+    #         new_raws += [raws[i]]
+    #         new_descriptions += [descriptions[i]]
+    #     counts[descriptions[i]['disorder']] += 1
+    # descriptions = new_descriptions
+    # raws = new_raws
 
     # preprocess dataset
     dataset = preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs)
