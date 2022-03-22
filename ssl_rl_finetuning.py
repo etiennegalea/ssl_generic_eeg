@@ -52,7 +52,7 @@ from segment_tuar import Segmenter_TUAR
 
 ### Load model
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='scopolamine', help='Dataset for downstream task: \
+@click.option('--dataset_name', '--dataset', '-n', default='tuh_abnormal', help='Dataset for downstream task: \
     "space_bambi", "sleep_staging", "tuh_abnormal", "scopolamine", "white_noise", "bci, "tuar".')
 @click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
 # @click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
@@ -790,8 +790,8 @@ def load_scopolamine_test_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_si
 def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
     print(':: loading TUH abnormal data')
 
-    data_dir = 'data/tuh_abnormal_data/eval/'
-    # data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
+    # data_dir = 'data/tuh_abnormal_data/eval/'
+    data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
 
     # build data dictionary
     annotations = {}
@@ -843,9 +843,9 @@ def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sampl
     raw_paths, descriptions, classification = shuffle(raw_paths, descriptions, classification)
 
     # limiters
-    raw_paths = raw_paths[:25]
-    descriptions = descriptions[:25]
-    classification = classification[:25]
+    raw_paths = raw_paths[:40]
+    descriptions = descriptions[:40]
+    classification = classification[:40]
 
     # load data and set annotations
     dataset = []
@@ -961,9 +961,9 @@ def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size
 
 
     # limiters
-    # raw_paths = raw_paths[:20]
-    # descriptions = descriptions[:20]
-    # classification = classification[:20]
+    raw_paths = raw_paths[:40]
+    descriptions = descriptions[:40]
+    classification = classification[:40]
 
     # load data and set annotations
     dataset = []
