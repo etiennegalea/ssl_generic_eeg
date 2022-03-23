@@ -65,8 +65,8 @@ from segment_tuar import Segmenter_TUAR
 @click.option('--lr', default=5e-3, help='Learning rate of the pretrained model.')
 @click.option('--batch_size', default=256, help='Batch size of the pretrained model.')
 @click.option('--n_channels', default=2, help='Number of channels.')
-@click.option('--connectivity_plot', default=False, help='Plot UMAP connectivity plot.')
-@click.option('--edge_bundling_plot', default=False, help='Plot UMAP connectivity plot with edge bundling (takes a long time).')
+@click.option('--connectivity_plot', default=True, help='Plot UMAP connectivity plot.')
+@click.option('--edge_bundling_plot', default=True, help='Plot UMAP connectivity plot with edge bundling (takes a long time).')
 @click.option('--plot_heavy', '-p', default=True, help='Plot heavy CPU intensive plots.')
 @click.option('--show_plots', '--show', default=False, help='Show plots.')
 @click.option('--load_feature_vectors', default=None, help='Load feature vectors passed through SSL model (input name of vector file).')
@@ -259,7 +259,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         conf_matrix = confusion_matrix(data['test'][1], test_y_pred)
         print(conf_matrix)
         # save plot
-        p.plot_confusion_matrix(conf_matrix)
+        # p.plot_confusion_matrix(conf_matrix)
 
         # classification report
         class_report = classification_report(data['test'][1], test_y_pred, target_names=annotations)
@@ -309,26 +309,26 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
     # clean_X, clean_y = np.array(clean_X), np.array(clean_y)
 
     ### Visualizing clusters
-    p.plot_PCA(X, y, annotations)
-    p.plot_TSNE(X, y, annotations)
-    p.plot_UMAP(X, y, annotations)
-    if connectivity_plot:
-        p.plot_UMAP_connectivity(X)
-    if edge_bundling_plot:
-        p.plot_UMAP_connectivity(X, edge_bundling=True)
-    p.plot_UMAP_3d(X, y, annotations)
+    # p.plot_PCA(X, y, annotations)
+    # p.plot_TSNE(X, y, annotations)
+    # p.plot_UMAP(X, y, annotations)
+    # if connectivity_plot:
+    #     p.plot_UMAP_connectivity(X)
+    # if edge_bundling_plot:
+    #     p.plot_UMAP_connectivity(X, edge_bundling=True)
+    # p.plot_UMAP_3d(X, y, annotations)
 
 
     # plotting with raw data (not embeddings)
-    p_fs = Plot('RAW_'+dataset_name, metadata_string, show=show_plots)
-    p_fs.plot_PCA(X_raw, y_raw, annotations)
-    p_fs.plot_TSNE(X_raw, y_raw, annotations)
-    p_fs.plot_UMAP(X_raw, y_raw, annotations)
-    if connectivity_plot:
-        p_fs.plot_UMAP_connectivity(X_raw)
-    if edge_bundling_plot:
-        p_fs.plot_UMAP_connectivity(X_raw, edge_bundling=True)
-    p_fs.plot_UMAP_3d(X_raw, y_raw, annotations)
+    # p_fs = Plot('RAW_'+dataset_name, metadata_string, show=show_plots)
+    # p_fs.plot_PCA(X_raw, y_raw, annotations)
+    # p_fs.plot_TSNE(X_raw, y_raw, annotations)
+    # p_fs.plot_UMAP(X_raw, y_raw, annotations)
+    # if connectivity_plot:
+    #     p_fs.plot_UMAP_connectivity(X_raw)
+    # if edge_bundling_plot:
+    #     p_fs.plot_UMAP_connectivity(X_raw, edge_bundling=True)
+    # p_fs.plot_UMAP_3d(X_raw, y_raw, annotations)
 
 
 
@@ -384,7 +384,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         conf_matrix = confusion_matrix(raw_data['test'][1], test_y_pred)
         print(conf_matrix)
         # save plot
-        p.plot_confusion_matrix(conf_matrix, 'FS')
+        # p.plot_confusion_matrix(conf_matrix, 'FS')
 
         # classification report
         class_report = classification_report(raw_data['test'][1], test_y_pred, target_names=annotations)

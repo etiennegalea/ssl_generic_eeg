@@ -53,7 +53,7 @@ class Plot:
 
         plt.style.use('seaborn-talk')
 
-        fig, ax = plt.subplots(2, 1, figsize=(12, 10))
+        fig, ax = plt.subplots(2, 1, figsize=(12, 10), sharex=True)
 
         for y1, y2, style, marker in zip(ys1, ys2, styles, markers):
             ax[0].plot(df['epoch'], df[y1], ls=style, marker=marker, ms=7,
@@ -62,7 +62,6 @@ class Plot:
 
             ax[0].tick_params(axis='y', labelcolor='tab:blue')
             ax[0].set_ylabel('Loss', color='tab:blue')
-            ax[0].set_xlabel('Epoch')
             ax[0].legend(lines1, labels1)
 
         for y1, y2, style, marker in zip(ys1, ys2, styles, markers):
@@ -80,6 +79,11 @@ class Plot:
 
         plt.suptitle('Pretext task performance for pretrained sleep staging model')
         plt.tight_layout()
+        plt.rc('font', size=16)
+        plt.rc('xtick', labelsize=16) 
+        plt.rc('ytick', labelsize=16)
+        plt.rc('axes', labelsize=16)
+
         self._plot(plt, 'train_loss_acc')
         print('Done')
 
@@ -172,7 +176,7 @@ class Plot:
             umap.plot.connectivity(mapping, show_points=True)
         else:
             title += ' (edge bundled)'
-            umap.plot.connectivity(mapping, edge_bundling='hammer') # bundles edges
+            umap.plot.connectivity(mapping, edge_bundling='hammer', cmap='rainbow') # bundles edges
             
         self._plot(plt, title)
         print('Done')
@@ -212,26 +216,17 @@ class Plot:
         print('Done')
 
     # Plot learning curves for fully-supervised and self-supervised logistic regression
-    def plot_learning_curves_sklearn(self, ssl_train_sizes, raw_train_sizes, ssl_train_scores, ssl_test_scores, raw_train_scores, raw_test_scores, dataset_name, scoring='balanced_accuracy'):
+    def plot_learning_curves_sklearn(self, ssl_train_sizes, raw_train_sizes, ssl_test_scores, raw_test_scores, dataset_name, scoring='balanced_accuracy'):
         # create additional features
-        ssl_train_scores_mean, ssl_test_scores_mean = np.mean(ssl_train_scores, axis=1), np.mean(ssl_test_scores, axis=1)
-        ssl_train_scores_std, ssl_test_scores_std = np.std(ssl_train_scores, axis=1), np.std(ssl_test_scores, axis=1)
-        raw_train_scores_mean, raw_test_scores_mean = np.mean(raw_train_scores, axis=1), np.mean(raw_test_scores, axis=1)
-        raw_train_scores_std, raw_test_scores_std = np.std(raw_train_scores, axis=1), np.std(raw_test_scores, axis=1)
+        ssl_test_scores_mean = np.mean(ssl_test_scores, axis=1)
+        ssl_test_scores_std = np.std(ssl_test_scores, axis=1)
+        raw_test_scores_mean = np.mean(raw_test_scores, axis=1)
+        raw_test_scores_std = np.std(raw_test_scores, axis=1)
         
-
         print(':: plotting learning curves (sklearn)... ', end='')
         _, ax = plt.subplots(1, 1, figsize=(20, 10))
         ax.grid()
 
-        # fill in std deviation for SSL
-        # ax.fill_between(
-        #     ssl_train_sizes,
-        #     ssl_train_scores_mean - ssl_train_scores_std,
-        #     ssl_train_scores_mean + ssl_train_scores_std,
-        #     alpha=0.1,
-        #     color="r",
-        # )
         ax.fill_between(
             ssl_train_sizes,
             ssl_test_scores_mean - ssl_test_scores_std,
@@ -239,15 +234,6 @@ class Plot:
             alpha=0.1,
             color="r",
         )
-
-        # fill in std deviation for FS
-        # ax.fill_between(
-        #     raw_train_sizes,
-        #     raw_train_scores_mean - raw_train_scores_std,
-        #     raw_train_scores_mean + raw_train_scores_std,
-        #     alpha=0.1,
-        #     color="g",
-        # )
         ax.fill_between(
             raw_train_sizes,
             raw_test_scores_mean - raw_test_scores_std,
@@ -261,11 +247,14 @@ class Plot:
         ax.set_ylabel(scoring)
 
         ax.set_title(f'Learning curves of a Self-Supervised and Fully-Supervised Logistic Regression scores per Training Example for {dataset_name} dataset')
-        # plt.plot(ssl_train_sizes, ssl_train_scores_mean, color='r', label='SSL Training Score')
         plt.plot(ssl_train_sizes, ssl_test_scores_mean, '-', color='r', label='SSL')
-        # plt.plot(raw_train_sizes, raw_train_scores_mean, color='g', label='FS Training Score')
         plt.plot(raw_train_sizes, raw_test_scores_mean, '-', color='g', label='FS')
         plt.legend(loc="best")
+        plt.rc('font', size=16)
+        plt.rc('xtick', labelsize=16) 
+        plt.rc('ytick', labelsize=16)
+        plt.rc('axes', labelsize=16)
+
 
         self._plot(plt, 'logit_learning_curves')
         print('Done')
