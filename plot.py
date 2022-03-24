@@ -224,6 +224,10 @@ class Plot:
         raw_test_scores_std = np.std(raw_test_scores, axis=1)
         
         print(':: plotting learning curves (sklearn)... ', end='')
+        plt.rc('font', size=26)
+        plt.rc('xtick', labelsize=26) 
+        plt.rc('ytick', labelsize=26)
+        plt.rc('axes', labelsize=26)
         _, ax = plt.subplots(1, 1, figsize=(20, 10))
         ax.grid()
 
@@ -246,15 +250,10 @@ class Plot:
         ax.set_xlabel("Training examples")
         ax.set_ylabel(scoring)
 
-        ax.set_title(f'Learning curves of a Self-Supervised and Fully-Supervised Logistic Regression scores per Training Example for {dataset_name} dataset')
+        plt.title(f'Balanced accuracy per training example for {dataset_name} dataset', fontsize=26)
         plt.plot(ssl_train_sizes, ssl_test_scores_mean, '-', color='r', label='SSL')
         plt.plot(raw_train_sizes, raw_test_scores_mean, '-', color='g', label='FS')
         plt.legend(loc="best")
-        plt.rc('font', size=16)
-        plt.rc('xtick', labelsize=16) 
-        plt.rc('ytick', labelsize=16)
-        plt.rc('axes', labelsize=16)
-
 
         self._plot(plt, 'logit_learning_curves')
         print('Done')

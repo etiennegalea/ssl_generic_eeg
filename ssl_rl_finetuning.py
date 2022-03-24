@@ -214,7 +214,6 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         scoring = 'balanced_accuracy'
         cv_train_size = int(np.floor(len(X)/cv * (cv-1)))
 
-
         # estimate learning curve specifications
         ssl_train_sizes, ssl_train_scores, ssl_test_scores = learning_curve(
             clf_pipe,
@@ -398,10 +397,8 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         # plotting learning curves
         p.plot_learning_curves_sklearn(
             ssl_train_sizes,
-            raw_train_sizes,
-            ssl_train_scores=ssl_train_scores, 
+            raw_train_sizes, 
             ssl_test_scores=ssl_test_scores, 
-            raw_train_scores=raw_train_scores, 
             raw_test_scores=raw_test_scores, 
             dataset_name=dataset_name
         )
@@ -843,9 +840,9 @@ def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sampl
     raw_paths, descriptions, classification = shuffle(raw_paths, descriptions, classification)
 
     # limiters
-    raw_paths = raw_paths[:40]
-    descriptions = descriptions[:40]
-    classification = classification[:40]
+    raw_paths = raw_paths[:10]
+    descriptions = descriptions[:10]
+    classification = classification[:10]
 
     # load data and set annotations
     dataset = []
