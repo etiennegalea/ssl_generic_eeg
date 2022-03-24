@@ -430,9 +430,9 @@ def fetch_dataset_path(dataset_name):
 
 @click.command()
 @click.option('--dataset_name', '--dataset', '-n', default='sleep_staging', help='Dataset to be pretrained (sleep_staging, tuh_abnormal, space_bambi_artifacts, space_bambi_asd).')
-@click.option('--subject_size_percent', default=5, help='Percentage of dataset (1-100)')
+@click.option('--subject_size_percent', default=100, help='Percentage of dataset (1-100)')
 @click.option('--random_state', default=87, help='Set a static random state so that the same result is generated everytime.')
-@click.option('--n_jobs', default=1, help='Number of subprocesses to run.')
+@click.option('--n_jobs', default=16, help='Number of subprocesses to run.')
 @click.option('--window_size_s', default=5, help='Window sizes in seconds.')
 # @click.option('--window_size_samples', default=3000, help='Window sizes in milliseconds.')
 @click.option('--high_cut_hz', default=30, help='High-pass filter frequency.')
@@ -440,8 +440,8 @@ def fetch_dataset_path(dataset_name):
 @click.option('--sfreq', default=100, help='Sampling frequency of the input data.')
 # @click.option('--emb_size', default=100, help='Embedding size of the model (should correspond to sampling frequency).')
 @click.option('--lr', default=5e-3, help='Learning rate of the pretrained model.')
-@click.option('--batch_size', default=256, help='Batch size of the pretrained model.')
-@click.option('--n_epochs', default=10, help='Number of epochs while training the pretrained model.')
+@click.option('--batch_size', default=512, help='Batch size of the pretrained model.')
+@click.option('--n_epochs', default=25, help='Number of epochs while training the pretrained model.')
 @click.option('--preprocessed_data', '-d', default=None, help='Preprocessed windowed data from previous run.')
 @click.option('--accepted_bads_ratio', default=0, help='Acceptable proportion of trials with inconsistent length in a raw. \
                 If the number of trials whose length is exceeded by the window size is \
