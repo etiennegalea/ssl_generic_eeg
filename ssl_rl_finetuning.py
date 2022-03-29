@@ -67,7 +67,7 @@ from segment_tuar import Segmenter_TUAR
 @click.option('--lr', default=5e-3, help='Learning rate of the pretrained model.')
 @click.option('--batch_size', default=256, help='Batch size of the pretrained model.')
 @click.option('--n_channels', default=2, help='Number of channels.')
-@click.option('--n_epochs', default=5, help='Number of epochs for training fully-supervised convolutional neural network.')
+@click.option('--n_epochs', default=15, help='Number of epochs for training fully-supervised convolutional neural network.')
 @click.option('--connectivity_plot', default=False, help='Plot UMAP connectivity plot.')
 @click.option('--edge_bundling_plot', default=False, help='Plot UMAP connectivity plot with edge bundling (takes a long time).')
 @click.option('--plot_heavy', '-p', default=False, help='Plot heavy CPU intensive plots.')
@@ -75,7 +75,7 @@ from segment_tuar import Segmenter_TUAR
 @click.option('--load_feature_vectors', default=None, help='Load feature vectors passed through SSL model (input name of vector file).')
 @click.option('--load_latest_model', default=False, help='Load the latest pretrained model from the ssl_rl_pretraining.py script.')
 @click.option('--fully_supervised', default=True, help='Train a fully-supervised model for comparison with the downstream task.')
-@click.option('--cv', default=2, help='Cross-validation folds to use for logistic regression.')
+@click.option('--cv', default=5, help='Cross-validation folds to use for logistic regression.')
 
 
 
