@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --time=24:00:00
-#SBATCH --output=output_whitenoise.log
-#SBATCH --error=error_whitenoise.log
+#SBATCH --time=10:00:00
+#SBATCH --output=output_tuar.log
+#SBATCH --error=error_tuar.log
 #SBATCH -N 2
 #SBATCH --ntasks-per-node=16
 #SBATCH -C TitanX
@@ -28,4 +28,4 @@ python -V
 # Run the actual experiment
 #python -u /var/scratch/ega470/ssl_thesis/ssl_rl_pretraining.py --dataset_name='sleep_staging'
 
-python -u /var/scratch/ega470/ssl_thesis/ssl_rl_finetuning.py --dataset_name='white_noise' --n_jobs=16 --window_size_s=5 --sfreq=100 --batch_size=256
+python -u /var/scratch/ega470/ssl_thesis/ssl_rl_finetuning.py --dataset_name='tuar' --n_jobs=16 --window_size_s=5 --sfreq=100 --batch_size=512 --connectivity_plot=False --edge_bundling_plot=False
