@@ -15,7 +15,8 @@ import pprint
 import mne
 import torch
 from torch import nn
-from torch.utils.data import DataLoader
+import torch.optim as optim
+from torch.utils.data import DataLoader, SubsetRandomSampler
 from braindecode.datasets.sleep_physionet import SleepPhysionet
 from braindecode.datasets.base import BaseConcatDataset, BaseDataset, WindowsDataset
 from braindecode.datautil.preprocess import preprocess, Preprocessor
@@ -23,13 +24,14 @@ from braindecode.preprocessing.windowers import create_windows_from_events, crea
 from braindecode.util import set_random_seeds
 from braindecode.datautil.preprocess import zscore
 from braindecode.datasets import create_from_mne_raw
+from braindecode.models import SleepStagerChambon2018
 
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, classification_report, balanced_accuracy_score
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import make_pipeline
-from sklearn.model_selection import train_test_split, learning_curve, cross_val_score
+from sklearn.model_selection import train_test_split, learning_curve, KFold
 
 from  mat73 import loadmat
 import matplotlib.pyplot as plt
@@ -52,12 +54,12 @@ from segment_tuar import Segmenter_TUAR
 
 ### Load model
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='tuh_abnormal', help='Dataset for downstream task: \
+@click.option('--dataset_name', '--dataset', '-n', default='sleep_staging', help='Dataset for downstream task: \
     "space_bambi", "sleep_staging", "tuh_abnormal", "scopolamine", "white_noise", "bci, "tuar".')
 @click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
 # @click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
 @click.option('--random_state', default=87, help='Set a static random state so that the same result is generated everytime.')
-@click.option('--n_jobs', default=1, help='Number of subprocesses to run.')
+@click.option('--n_jobs', default=16, help='Number of subprocesses to run.')
 @click.option('--window_size_s', default=5, help='Window sizes in seconds.')
 @click.option('--high_cut_hz', '--hfreq', '-h', default=30, help='High-pass filter frequency.')
 @click.option('--low_cut_hz', '--lfreq', '-l', default=0.5, help='Low-pass filter frequency.')
@@ -65,9 +67,10 @@ from segment_tuar import Segmenter_TUAR
 @click.option('--lr', default=5e-3, help='Learning rate of the pretrained model.')
 @click.option('--batch_size', default=256, help='Batch size of the pretrained model.')
 @click.option('--n_channels', default=2, help='Number of channels.')
-@click.option('--connectivity_plot', default=True, help='Plot UMAP connectivity plot.')
-@click.option('--edge_bundling_plot', default=True, help='Plot UMAP connectivity plot with edge bundling (takes a long time).')
-@click.option('--plot_heavy', '-p', default=True, help='Plot heavy CPU intensive plots.')
+@click.option('--n_epochs', default=5, help='Number of epochs for training fully-supervised convolutional neural network.')
+@click.option('--connectivity_plot', default=False, help='Plot UMAP connectivity plot.')
+@click.option('--edge_bundling_plot', default=False, help='Plot UMAP connectivity plot with edge bundling (takes a long time).')
+@click.option('--plot_heavy', '-p', default=False, help='Plot heavy CPU intensive plots.')
 @click.option('--show_plots', '--show', default=False, help='Show plots.')
 @click.option('--load_feature_vectors', default=None, help='Load feature vectors passed through SSL model (input name of vector file).')
 @click.option('--load_latest_model', default=False, help='Load the latest pretrained model from the ssl_rl_pretraining.py script.')
@@ -76,7 +79,7 @@ from segment_tuar import Segmenter_TUAR
 
 
 
-def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cut_hz, high_cut_hz, sfreq, lr, batch_size, n_channels, connectivity_plot, edge_bundling_plot, plot_heavy, show_plots, load_feature_vectors, load_latest_model, fully_supervised, cv):
+def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cut_hz, high_cut_hz, sfreq, lr, n_epochs, batch_size, n_channels, connectivity_plot, edge_bundling_plot, plot_heavy, show_plots, load_feature_vectors, load_latest_model, fully_supervised, cv):
     print(':: STARTING MAIN ::')
     
     # clustering according to description (init)
@@ -107,8 +110,6 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
 
     # DOWNSTREAM TASK - FINE TUNING)
     if load_feature_vectors is None:
-        
-
         if dataset_name == 'sleep_staging':
             annotations = ['W', 'N1', 'N2', 'N3', 'R']
             windows_dataset = load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq)
@@ -145,7 +146,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             annotations = ['artifact', 'non-artifact', 'ignored']
             windows_dataset = load_tuar_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
 
-
+        n_classes = len(annotations)
         # print all parameter vars
         setup = tabulate(locals().items(), tablefmt='fancy_grid')
         print(setup)
@@ -180,6 +181,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         num_workers = n_jobs
 
         # Extract features with the trained embedder
+        dataset = []
         data, raw_data, descriptions = dict(), dict(), dict()
         for name, split in splitted.items():
             split.return_pair = False  # Return single windows
@@ -194,6 +196,10 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             data[name] = (np.concatenate(feats), split.get_metadata()['target'].values)
             # concatenate channels per window such that you will have 10s windows
             raw_data[name] = ([np.concatenate(x.T) for x in np.concatenate(raw_vectors)], split.get_metadata()['target'].values)
+            # add data and targets to [dataset]
+            for ds in split.datasets:
+                for window in ds:
+                    dataset += [window[0:2]]
 
         # combine all vectors (X) and labels (y) from DATA sets
         X = np.concatenate([v[0] for k, v in data.items()])
@@ -202,8 +208,10 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             desc = np.concatenate([v for k, v in descriptions.items()])
 
         # combine all vectors (X) and labels (y) from RAW_DATA sets
-        X_raw = np.concatenate([v[0] for k, v in raw_data.items()])
-        y_raw = np.concatenate([v[1] for k, v in raw_data.items()])
+        # X_raw = np.concatenate([v[0] for k, v in raw_data.items()])
+        # y_raw = np.concatenate([v[1] for k, v in raw_data.items()])
+
+        print(f':: Solving classification task for {dataset_name} using {X} feature vectors.')
 
         # Initialize the logistic regression model
         log_reg = LogisticRegression(
@@ -212,7 +220,8 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         clf_pipe = make_pipeline(StandardScaler(), log_reg)
 
         scoring = 'balanced_accuracy'
-        cv_train_size = int(np.floor(len(X)/cv * (cv-1)))
+        # cv_train_size = int(np.floor(len(X)/cv * (cv-1)))
+        space = np.linspace(0.001,1,10)
 
         # estimate learning curve specifications
         ssl_train_sizes, ssl_train_scores, ssl_test_scores = learning_curve(
@@ -222,7 +231,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             cv=cv,
             scoring=scoring,
             n_jobs=-1,
-            train_sizes = np.linspace(0.00001,1,20),
+            train_sizes = space,
             # train_sizes = hf.factored_space(cv_train_size, 10),
             shuffle=True
         )
@@ -331,87 +340,193 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
 
 
 
-    ### Train a fully-supervised logistic regresion for comparison and evaluation
+    ### Train a fully-supervised CNN for comparison and evaluation
     if fully_supervised:
-        print(f':: Performing Fully-Supervised Logistic Regression for {dataset_name}')
-        # re-init logistic regression
-        log_reg = LogisticRegression(
-            penalty='l2', C=1.0, class_weight='balanced', solver='newton-cg',
-            multi_class='multinomial', random_state=random_state, max_iter=1000, tol=0.01)
-        fs_pipe = make_pipeline(StandardScaler(), log_reg)
+        print(f':: Performing training / testing fully-supervised CNN for {dataset_name} using SleepStagerChambon_2018 + classifier model...')
 
-        cv_train_size = int(np.floor(len(X_raw)/cv * (cv-1)))
+        n_channels, input_size_samples = windows_dataset[0][0].shape
 
-        raw_train_sizes, raw_train_scores, raw_test_scores = learning_curve(
-            fs_pipe,
-            X=X_raw,
-            y=y_raw,
-            cv=cv,
-            scoring=scoring,
-            n_jobs=-1,
-            train_sizes = np.linspace(0.00001,1,20),
-            # train_sizes = hf.factored_space(cv_train_size, 10),
-            shuffle=True
+        fs_model = SleepStagerChambon2018(
+            n_channels,
+            sfreq,
+            n_classes=n_classes,
+            n_conv_chs=16,
+            input_size_s=input_size_samples / sfreq,
+            dropout=0,
+            apply_batch_norm=True
         )
+        print(fs_model)
 
+        fs_results = []
+        line = '-'*100
+        criterion = nn.CrossEntropyLoss()
+        optimizer = optim.SGD(fs_model.parameters(), lr=lr, momentum=0.9)
 
-        # raw_space = np.linspace(0.0001,1,40)
-        # raw_space = np.ceil(raw_space*len(X_raw)).astype(int)
-        # # train statified FS logit with CV to obtain learning scores
-        # raw_train_scores = [np.array([0.0]*cv)]
-        # for i in raw_space: 
-        #     _X, _y = X_raw[:i], y_raw[:i]
-        #     raw_train_scores += [cross_val_score(fs_pipe, _X, _y, cv=cv, scoring=scoring)]
+        # 5-fold cross-validation
+        kfold = KFold(n_splits=cv, shuffle=True, random_state=random_state)
 
-        # Fit and score the logistic regression on raw vectors
-        fs_pipe.fit(*raw_data['train'])
-        train_y_pred = fs_pipe.predict(raw_data['train'][0])
-        valid_y_pred = fs_pipe.predict(raw_data['valid'][0])
-        test_y_pred = fs_pipe.predict(raw_data['test'][0])
+        # K-fold Cross Validation model evaluation
+        for fold, (train_ids, test_ids) in enumerate(kfold.split(dataset)):
+            
+            # Init the neural network
+            print('Resetting trainable parameters...')
+            fs_model.apply(reset_weights)
 
-        train_bal_acc = balanced_accuracy_score(raw_data['train'][1], train_y_pred)
-        valid_bal_acc = balanced_accuracy_score(raw_data['valid'][1], valid_y_pred)
-        test_bal_acc = balanced_accuracy_score(raw_data['test'][1], test_y_pred)
+            print(f'FOLD {fold}')
+            print(line)
 
-        print(f'{dataset_name} with logistic regression:')
-        print(f'Train bal acc: {train_bal_acc:0.4f}')
-        print(f'Valid bal acc: {valid_bal_acc:0.4f}')
-        print(f'Test bal acc: {test_bal_acc:0.4f}')
+            train_space = np.round(space * len(train_ids))
+            test_subsampler = SubsetRandomSampler(test_ids) # all testing examples
+            set_bal_acc = []
+
+            for i, training_set in enumerate(train_space):
+                _set = train_ids[:int(training_set)]
+                print(f'#{i}[{len(_set)}] \t -- epochs ', end='')
+                
+                # Sample elements randomly from a given list of ids, no replacement.
+                train_subsampler = SubsetRandomSampler(_set)
+                # Define data loaders for training and testing data in this fold
+                trainloader = DataLoader(dataset, batch_size=batch_size, sampler=train_subsampler)
+                testloader = DataLoader(dataset, batch_size=batch_size, sampler=test_subsampler)
+
+                for epoch in range(n_epochs):
+                    running_loss = 0.0
+                    bal_acc = []
+                    print(f' | {epoch+1}', end='')
+
+                    # Iterate over the DataLoader for training data
+                    for _i, data in enumerate(trainloader, 0):
+
+                        # get the inputs; data is a list of [inputs, labels]
+                        inputs, labels = data
+                        # zero the parameter gradients
+                        optimizer.zero_grad()
+                        # forward + backward + optimize
+                        outputs = fs_model(inputs)
+                        loss = criterion(outputs, labels)
+                        loss.backward()
+                        optimizer.step()
+
+                        running_loss += loss.item()
+
+                # TESTING all test space
+                y_true = []
+                y_pred = []
+                total = 0
+                with torch.no_grad():
+                    for _i, data in enumerate(testloader):
+                        inputs, labels = data
+                        outputs = fs_model(inputs)
+                        _, predicted = torch.max(outputs.data, 1)
+                        y_true += [labels]
+                        y_pred += [predicted]
+                        total += labels.size(0)
+                        # correct += (predicted == labels).sum().item()
+
+                    y_true = np.concatenate(y_true)
+                    y_pred = np.concatenate(y_pred)
+                _bal_acc = balanced_accuracy_score(y_true, y_pred)
+                set_bal_acc += [_bal_acc]
+                print(f' --> bal_acc: {_bal_acc:.4f}')
+                running_loss = 0.0
+
+            fs_results += [set_bal_acc]
+
+        print('Finished Training')
+
+        fs_results = np.array(fs_results).T
+
+        conf_matrix, class_report = conf_matrix_class_report(fs_model, testloader, n_classes)
 
         print('Results on test set:')
-        # confusion matrix
-        conf_matrix = confusion_matrix(raw_data['test'][1], test_y_pred)
         print(conf_matrix)
-        # save plot
-        # p.plot_confusion_matrix(conf_matrix, 'FS')
-
-        # classification report
-        class_report = classification_report(raw_data['test'][1], test_y_pred, target_names=annotations)
+        # save matrix
+        p.plot_confusion_matrix(conf_matrix, 'FS')
+        
         print(class_report)
         # save report
         dir = 'classification_reports/downstream/FS/'
         hf.check_dir(dir)
         with open(f'{dir}{hf.get_datetime()}_class_report_{metadata_string}.txt', "w") as f:
             f.write(pprint.pformat(class_report, indent=4, sort_dicts=False))
+        
+        # print(f':: Performing Fully-Supervised Logistic Regression for {dataset_name}')
+        # # re-init logistic regression
+        # log_reg = LogisticRegression(
+        #     penalty='l2', C=1.0, class_weight='balanced', solver='newton-cg',
+        #     multi_class='multinomial', random_state=random_state, max_iter=1000, tol=0.01)
+        # fs_pipe = make_pipeline(StandardScaler(), log_reg)
+
+        # cv_train_size = int(np.floor(len(X_raw)/cv * (cv-1)))
+
+        # raw_train_sizes, raw_train_scores, raw_test_scores = learning_curve(
+        #     fs_pipe,
+        #     X=X_raw,
+        #     y=y_raw,
+        #     cv=cv,
+        #     scoring=scoring,
+        #     n_jobs=-1,
+        #     train_sizes = np.linspace(0.00001,1,20),
+        #     # train_sizes = hf.factored_space(cv_train_size, 10),
+        #     shuffle=True
+        # )
+
+
+        # # raw_space = np.linspace(0.0001,1,40)
+        # # raw_space = np.ceil(raw_space*len(X_raw)).astype(int)
+        # # # train statified FS logit with CV to obtain learning scores
+        # # raw_train_scores = [np.array([0.0]*cv)]
+        # # for i in raw_space: 
+        # #     _X, _y = X_raw[:i], y_raw[:i]
+        # #     raw_train_scores += [cross_val_score(fs_pipe, _X, _y, cv=cv, scoring=scoring)]
+
+        # # Fit and score the logistic regression on raw vectors
+        # fs_pipe.fit(*raw_data['train'])
+        # train_y_pred = fs_pipe.predict(raw_data['train'][0])
+        # valid_y_pred = fs_pipe.predict(raw_data['valid'][0])
+        # test_y_pred = fs_pipe.predict(raw_data['test'][0])
+
+        # train_bal_acc = balanced_accuracy_score(raw_data['train'][1], train_y_pred)
+        # valid_bal_acc = balanced_accuracy_score(raw_data['valid'][1], valid_y_pred)
+        # test_bal_acc = balanced_accuracy_score(raw_data['test'][1], test_y_pred)
+
+        # print(f'{dataset_name} with logistic regression:')
+        # print(f'Train bal acc: {train_bal_acc:0.4f}')
+        # print(f'Valid bal acc: {valid_bal_acc:0.4f}')
+        # print(f'Test bal acc: {test_bal_acc:0.4f}')
+
+        # print('Results on test set:')
+        # # confusion matrix
+        # conf_matrix = confusion_matrix(raw_data['test'][1], test_y_pred)
+        # print(conf_matrix)
+        # # save plot
+        # # p.plot_confusion_matrix(conf_matrix, 'FS')
+
+        # # classification report
+        # class_report = classification_report(raw_data['test'][1], test_y_pred, target_names=annotations)
+        # print(class_report)
+        # # save report
+        # dir = 'classification_reports/downstream/FS/'
+        # hf.check_dir(dir)
+        # with open(f'{dir}{hf.get_datetime()}_class_report_{metadata_string}.txt', "w") as f:
+        #     f.write(pprint.pformat(class_report, indent=4, sort_dicts=False))
 
         # plotting learning curves
         p.plot_learning_curves_sklearn(
-            ssl_train_sizes,
-            raw_train_sizes, 
+            train_space, 
             ssl_test_scores=ssl_test_scores, 
-            raw_test_scores=raw_test_scores, 
+            raw_test_scores=fs_results,
             dataset_name=dataset_name
         )
 
-
-        # plotting learning curves
-        # p.plot_learning_curves(
-        #     ssl_space,
-        #     raw_space,
-        #     ssl_train_scores=ssl_train_scores,
-        #     raw_train_scores=raw_train_scores, 
-        #     dataset_name=dataset_name
-        # )
+        # # plotting learning curves
+        # # p.plot_learning_curves(
+        # #     ssl_space,
+        # #     raw_space,
+        # #     ssl_train_scores=ssl_train_scores,
+        # #     raw_train_scores=raw_train_scores, 
+        # #     dataset_name=dataset_name
+        # # )
 
 
 # ---------------------------------- PROCESSING FUNCTIONS ----------------------------------
@@ -452,6 +567,40 @@ def create_windows_dataset(raws, window_size_samples, descriptions=None, mapping
     preprocess(windows_dataset, [Preprocessor(zscore)])
 
     return windows_dataset
+
+def reset_weights(m):
+	'''
+		Try resetting model weights to avoid
+		weight leakage.
+	'''
+	for layer in m.children():
+		if hasattr(layer, 'reset_parameters'):
+			# print(f'Reset trainable parameters of layer = {layer}')
+			layer.reset_parameters()
+
+# confusion matrix
+def conf_matrix_class_report(model, dataloader, n_classes, device='cpu'):
+		confusion_matrix = torch.zeros(n_classes, n_classes)
+		y_pred = []
+		y_true = []
+		with torch.no_grad():
+			for i, (inputs, labels) in enumerate(dataloader):
+				inputs = inputs.to(device)
+				labels = labels.to(device)
+				outputs = model(inputs)
+				_, preds = torch.max(outputs, 1)
+				for t, p in zip(labels.view(-1), preds.view(-1)):
+								confusion_matrix[t, p] += 1
+				y_pred += [preds]
+				y_true += [labels]
+
+		y_pred = np.concatenate(y_pred)
+		y_true = np.concatenate(y_true)
+
+		class_report = classification_report(y_true=y_true, y_pred=y_pred)
+
+		torch.set_printoptions(sci_mode=False)
+		return confusion_matrix, class_report
 
 # ---------------------------------- LOADING DATASETS ----------------------------------
 

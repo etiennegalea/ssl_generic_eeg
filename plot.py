@@ -216,7 +216,14 @@ class Plot:
         print('Done')
 
     # Plot learning curves for fully-supervised and self-supervised logistic regression
-    def plot_learning_curves_sklearn(self, ssl_train_sizes, raw_train_sizes, ssl_test_scores, raw_test_scores, dataset_name, scoring='balanced_accuracy'):
+    def plot_learning_curves_sklearn(self, train_sizes, ssl_test_scores, raw_test_scores, dataset_name, scoring='balanced_accuracy'):
+        '''
+            train_sizes: set sizes used for training
+            ssl_test_scores: test scores obtained for the SSL method
+            raw_test_scores: test scores obtained for the FS method
+            dataset: dataset name to be used in title
+            scoring: scoring method used (for label)
+        '''
         # create additional features
         ssl_test_scores_mean = np.mean(ssl_test_scores, axis=1)
         ssl_test_scores_std = np.std(ssl_test_scores, axis=1)
@@ -232,14 +239,14 @@ class Plot:
         ax.grid()
 
         ax.fill_between(
-            ssl_train_sizes,
+            train_sizes,
             ssl_test_scores_mean - ssl_test_scores_std,
             ssl_test_scores_mean + ssl_test_scores_std,
             alpha=0.1,
             color="r",
         )
         ax.fill_between(
-            raw_train_sizes,
+            train_sizes,
             raw_test_scores_mean - raw_test_scores_std,
             raw_test_scores_mean + raw_test_scores_std,
             alpha=0.1,
@@ -251,8 +258,8 @@ class Plot:
         ax.set_ylabel(scoring)
 
         plt.title(f'Balanced accuracy per training example for {dataset_name} dataset', fontsize=26)
-        plt.plot(ssl_train_sizes, ssl_test_scores_mean, '-', color='r', label='SSL')
-        plt.plot(raw_train_sizes, raw_test_scores_mean, '-', color='g', label='FS')
+        plt.plot(train_sizes, ssl_test_scores_mean, '-', color='r', label='SSL')
+        plt.plot(train_sizes, raw_test_scores_mean, '-', color='g', label='FS')
         plt.legend(loc="best")
 
         self._plot(plt, 'logit_learning_curves')
