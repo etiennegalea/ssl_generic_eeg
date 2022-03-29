@@ -1001,10 +1001,6 @@ def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sampl
         raw = raw.set_annotations(mne.Annotations(onset=[0], duration=raw.times.max(), description=[_class]))
         dataset.append(raw)
 
-    pp = pprint.PrettyPrinter(indent=2)
-    pp.pprint(raw_paths)
-    pp.pprint(dataset)
-
     # preprocess dataset
     dataset = preprocess_raws(dataset, sfreq, low_cut_hz, high_cut_hz, n_jobs)
 
@@ -1115,7 +1111,7 @@ def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size
     dataset = []
     for i, path in enumerate(raw_paths):
         _class = classification[i]
-        raw = mne.io.read_raw_fif(path, preload=True)
+        raw = mne.io.read_raw_fif(path, preload=False)
         raw = raw.set_annotations(mne.Annotations(onset=[0], duration=raw.times.max(), description=[_class]))
         dataset.append(raw)
 
