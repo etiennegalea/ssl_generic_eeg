@@ -91,7 +91,7 @@ class Plot:
 
     def plot_confusion_matrix(self, conf_matrix, _title=''):
         print(':: plotting confusion matrix heatmap... ', end='')
-        sns.heatmap(conf_matrix, annot=True, fmt='d', linewidths=2)
+        sns.heatmap(conf_matrix, annot=True, fmt='.1f', linewidths=2)
         self._plot(plt, 'conf_matrix', _title)
         print('Done')
 

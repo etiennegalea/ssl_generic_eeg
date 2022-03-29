@@ -75,7 +75,7 @@ from segment_tuar import Segmenter_TUAR
 @click.option('--load_feature_vectors', default=None, help='Load feature vectors passed through SSL model (input name of vector file).')
 @click.option('--load_latest_model', default=False, help='Load the latest pretrained model from the ssl_rl_pretraining.py script.')
 @click.option('--fully_supervised', default=True, help='Train a fully-supervised model for comparison with the downstream task.')
-@click.option('--cv', default=5, help='Cross-validation folds to use for logistic regression.')
+@click.option('--cv', default=2, help='Cross-validation folds to use for logistic regression.')
 
 
 
@@ -211,7 +211,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         # X_raw = np.concatenate([v[0] for k, v in raw_data.items()])
         # y_raw = np.concatenate([v[1] for k, v in raw_data.items()])
 
-        print(f':: Solving classification task for {dataset_name} using {X} feature vectors.')
+        print(f':: Solving classification task for {dataset_name} using {X.shape} feature vectors.')
 
         # Initialize the logistic regression model
         log_reg = LogisticRegression(
@@ -936,8 +936,8 @@ def load_scopolamine_test_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_si
 def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
     print(':: loading TUH abnormal data')
 
-    # data_dir = 'data/tuh_abnormal_data/eval/'
-    data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
+    data_dir = 'data/tuh_abnormal_data/eval/'
+    # data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
 
     # build data dictionary
     annotations = {}
