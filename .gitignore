@@ -70,3 +70,5 @@ models/
 plots/
 feature_vectors/
 classification_reports/
+__pycache__/helper_funcs.cpython-38.pyc
+braindecode
