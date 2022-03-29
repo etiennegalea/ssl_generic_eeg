@@ -989,9 +989,9 @@ def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sampl
     raw_paths, descriptions, classification = shuffle(raw_paths, descriptions, classification)
 
     # limiters
-    raw_paths = raw_paths[:10]
-    descriptions = descriptions[:10]
-    classification = classification[:10]
+    raw_paths = raw_paths[:40]
+    descriptions = descriptions[:40]
+    classification = classification[:40]
 
     # load data and set annotations
     dataset = []
@@ -1065,7 +1065,7 @@ def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size
                 dates = {}
                 for date in hf.get_file_list(recording):
                     for raw_path in hf.get_file_list(date):
-                        if '_2_channels.fif' in hf.get_id(raw_path):
+                        if '_2_channels_reref.fif' in hf.get_id(raw_path):
                             break
                         else:
                             pass
@@ -1143,6 +1143,10 @@ def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size
 
     # create windows
     windows_dataset = create_windows_dataset(dataset, window_size_samples, descriptions, mapping)
+
+    	
+    # channel-wise zscore normalization	
+    preprocess(windows_dataset, [Preprocessor(zscore)])
 
     return windows_dataset
 
