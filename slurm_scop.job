@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --time=10:00:00
-#SBATCH --output=output.log
-#SBATCH --error=error.log
-#SBATCH -N 4
+#SBATCH --output=output_scop.log
+#SBATCH --error=error_scop.log
+#SBATCH -N 2
 #SBATCH --ntasks-per-node=16
 #SBATCH -C TitanX
 #SBATCH --gres=gpu:1
@@ -28,4 +28,4 @@ python -V
 # Run the actual experiment
 #python -u /var/scratch/ega470/ssl_thesis/ssl_rl_pretraining.py --dataset_name='sleep_stagi ng'
 
-python -u /var/scratch/ega470/ssl_thesis/ssl_rl_finetuning.py --dataset_name='scopolamine' --n_jobs=16 --window_size_s=5 --sfreq=100 --batch_size=512 --connectivity_plot=True --edge_bundling_plot=True
+python -u /var/scratch/ega470/ssl_thesis/ssl_rl_finetuning.py --dataset_name='scopolamine' --n_jobs=16 --window_size_s=5 --sfreq=100 --batch_size=256

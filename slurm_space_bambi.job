@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --time=10:00:00
-#SBATCH --output=output.log
-#SBATCH --error=error.log
+#SBATCH --output=output_space.log
+#SBATCH --error=error_space.log
 #SBATCH -N 2
 #SBATCH --ntasks-per-node=16
 #SBATCH -C TitanX
@@ -28,4 +28,4 @@ python -V
 # Run the actual experiment
 #python -u /var/scratch/ega470/ssl_thesis/ssl_rl_pretraining.py --dataset_name='sleep_staging'
 
-python -u /var/scratch/ega470/ssl_thesis/ssl_rl_finetuning.py --dataset_name='space_bambi' --n_jobs=16 --window_size_s=5 --sfreq=100 --batch_size=512 --connectivity_plot=False --edge_bundling_plot=False
+python -u /var/scratch/ega470/ssl_thesis/ssl_rl_finetuning.py --dataset_name='space_bambi' --n_jobs=16 --window_size_s=5 --sfreq=100 --batch_size=256

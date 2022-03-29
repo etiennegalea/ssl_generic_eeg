@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --time=24:00:00
-#SBATCH --output=output_whitenoise.log
-#SBATCH --error=error_whitenoise.log
+#SBATCH --output=output_pretrain.log
+#SBATCH --error=error_pretrain.log
 #SBATCH -N 2
 #SBATCH --ntasks-per-node=16
 #SBATCH -C TitanX
@@ -25,7 +25,5 @@ cd /var/scratch/ega470/ssl_thesis/
 
 python -V
 
-# Run the actual experiment
-#python -u /var/scratch/ega470/ssl_thesis/ssl_rl_pretraining.py --dataset_name='sleep_staging'
-
-python -u /var/scratch/ega470/ssl_thesis/ssl_rl_finetuning.py --dataset_name='white_noise' --n_jobs=16 --window_size_s=5 --sfreq=100 --batch_size=256
+# Pretraining
+python -u /var/scratch/ega470/ssl_thesis/ssl_rl_pretraining.py --dataset_name='sleep_staging' --n_epochs=25 --batch_size=512 --subject_size_percent=100
