@@ -68,9 +68,9 @@ from segment_tuar import Segmenter_TUAR
 @click.option('--batch_size', default=256, help='Batch size of the pretrained model.')
 @click.option('--n_channels', default=2, help='Number of channels.')
 @click.option('--n_epochs', default=15, help='Number of epochs for training fully-supervised convolutional neural network.')
-@click.option('--connectivity_plot', default=False, help='Plot UMAP connectivity plot.')
-@click.option('--edge_bundling_plot', default=False, help='Plot UMAP connectivity plot with edge bundling (takes a long time).')
-@click.option('--plot_heavy', '-p', default=False, help='Plot heavy CPU intensive plots.')
+@click.option('--connectivity_plot', default=True, help='Plot UMAP connectivity plot.')
+@click.option('--edge_bundling_plot', default=True, help='Plot UMAP connectivity plot with edge bundling (takes a long time).')
+@click.option('--plot_heavy', '-p', default=True, help='Plot heavy CPU intensive plots.')
 @click.option('--show_plots', '--show', default=False, help='Show plots.')
 @click.option('--load_feature_vectors', default=None, help='Load feature vectors passed through SSL model (input name of vector file).')
 @click.option('--load_latest_model', default=False, help='Load the latest pretrained model from the ssl_rl_pretraining.py script.')
@@ -208,8 +208,8 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             desc = np.concatenate([v for k, v in descriptions.items()])
 
         # combine all vectors (X) and labels (y) from RAW_DATA sets
-        # X_raw = np.concatenate([v[0] for k, v in raw_data.items()])
-        # y_raw = np.concatenate([v[1] for k, v in raw_data.items()])
+        X_raw = np.concatenate([v[0] for k, v in raw_data.items()])
+        y_raw = np.concatenate([v[1] for k, v in raw_data.items()])
 
         print(f':: Solving classification task for {dataset_name} using {X.shape} feature vectors.')
 
@@ -317,26 +317,26 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
     # clean_X, clean_y = np.array(clean_X), np.array(clean_y)
 
     ### Visualizing clusters
-    # p.plot_PCA(X, y, annotations)
-    # p.plot_TSNE(X, y, annotations)
-    # p.plot_UMAP(X, y, annotations)
-    # if connectivity_plot:
-    #     p.plot_UMAP_connectivity(X)
-    # if edge_bundling_plot:
-    #     p.plot_UMAP_connectivity(X, edge_bundling=True)
-    # p.plot_UMAP_3d(X, y, annotations)
+    p.plot_PCA(X, y, annotations)
+    p.plot_TSNE(X, y, annotations)
+    p.plot_UMAP(X, y, annotations)
+    if connectivity_plot:
+        p.plot_UMAP_connectivity(X)
+    if edge_bundling_plot:
+        p.plot_UMAP_connectivity(X, edge_bundling=True)
+    p.plot_UMAP_3d(X, y, annotations)
 
 
     # plotting with raw data (not embeddings)
-    # p_fs = Plot('RAW_'+dataset_name, metadata_string, show=show_plots)
-    # p_fs.plot_PCA(X_raw, y_raw, annotations)
-    # p_fs.plot_TSNE(X_raw, y_raw, annotations)
-    # p_fs.plot_UMAP(X_raw, y_raw, annotations)
-    # if connectivity_plot:
-    #     p_fs.plot_UMAP_connectivity(X_raw)
-    # if edge_bundling_plot:
-    #     p_fs.plot_UMAP_connectivity(X_raw, edge_bundling=True)
-    # p_fs.plot_UMAP_3d(X_raw, y_raw, annotations)
+    p_fs = Plot('RAW_'+dataset_name, metadata_string, show=show_plots)
+    p_fs.plot_PCA(X_raw, y_raw, annotations)
+    p_fs.plot_TSNE(X_raw, y_raw, annotations)
+    p_fs.plot_UMAP(X_raw, y_raw, annotations)
+    if connectivity_plot:
+        p_fs.plot_UMAP_connectivity(X_raw)
+    if edge_bundling_plot:
+        p_fs.plot_UMAP_connectivity(X_raw, edge_bundling=True)
+    p_fs.plot_UMAP_3d(X_raw, y_raw, annotations)
 
 
 
@@ -1111,7 +1111,7 @@ def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size
     dataset = []
     for i, path in enumerate(raw_paths):
         _class = classification[i]
-        raw = mne.io.read_raw_fif(path, preload=False)
+        raw = mne.io.read_raw_fif(path, preload=True)
         raw = raw.set_annotations(mne.Annotations(onset=[0], duration=raw.times.max(), description=[_class]))
         dataset.append(raw)
 
