@@ -54,12 +54,12 @@ from segment_tuar import Segmenter_TUAR
 
 ### Load model
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='sleep_staging', help='Dataset for downstream task: \
+@click.option('--dataset_name', '--dataset', '-n', default='scopolamine', help='Dataset for downstream task: \
     "space_bambi", "sleep_staging", "tuh_abnormal", "scopolamine", "white_noise", "bci, "tuar".')
 @click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
 # @click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
 @click.option('--random_state', default=87, help='Set a static random state so that the same result is generated everytime.')
-@click.option('--n_jobs', default=16, help='Number of subprocesses to run.')
+@click.option('--n_jobs', default=1, help='Number of subprocesses to run.')
 @click.option('--window_size_s', default=5, help='Window sizes in seconds.')
 @click.option('--high_cut_hz', '--hfreq', '-h', default=30, help='High-pass filter frequency.')
 @click.option('--low_cut_hz', '--lfreq', '-l', default=0.5, help='Low-pass filter frequency.')
@@ -825,25 +825,44 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s,
 def load_scop_raws(dir_path, info, classification, dataset, descriptions):
     raws, desc = [], []
 
-    paths = os.listdir(dir_path)
-    for i, path in enumerate(paths):
-        # print(path)
-        raw = mne.io.read_raw_fif(dir_path+path)
+    mats = os.listdir(dir_path)
+    for i, mat in enumerate(mats):
+
+        # ---
+        print(f'mat file: {mat}')
+        # select columns 3 and 4 (Fpz-Cz, and Pz-Oz respectively) and convert to microvolts
+        x = loadmat(dir_path + mat)['RawSignal'][:, [2,3]].T / 1000000 # 1e+6
+        # switch indexes (maybe Pz-Oz, Fpz-Cz...)
+        x = x[::-1]
+        raw = mne.io.RawArray(x, info)
+        raw = raw.set_annotations(mne.Annotations(onset=[0], duration=raw.times.max(), description=[classification]))
+
+        # extract file name only
+        mat = mat.split('.mat')[0]
+
+        # preprocess
+        raw = raw.resample(100)   # resample
+        raw = raw.filter(l_freq=0.5, h_freq=30, n_jobs=1)    # filtering
+        # ---
+
+        print(dir_path, mat)
+        # raw = mne.io.read_raw_fif(dir_path+path)
         # subject
-        subject = int(path.split('.')[1][2:])
+        subject = int(mat.split('.')[1][2:])
         # recording (occasion)
-        recording = int(path.split('.')[-2].split('M')[0][1:])
+        # recording = int(mat.split('.')[-2].split('M')[0][1:])
+        recording = i
         # treatment period
-        treatment_period = int(path.split('.')[-2].split('M')[-1])
+        treatment_period = int(mat.split('.')[-1].split('M')[0][1:])
 
         # if even (not placebo)
         # if not recording&1:
         raws += [raw]
-        desc += [{'subject': subject, 'recording': recording, 'treatment_period': treatment_period, 'raw': dir_path+path}]
+        desc += [{'subject': subject, 'recording': recording, 'treatment_period': treatment_period, 'raw': dir_path+mat}]
 
         # limiter
-        if i == 30:
-            break
+        # if i == 5:
+        #     break
 
     dataset += raws
     descriptions += desc
@@ -855,12 +874,12 @@ def load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sa
     print(':: loading SCOPOLAMINE data')
 
     # 11 measurements times from 0.5 hrs to 8.5 hrs after Scopolamine (or placebo) administration
-    m01 = 'data/scopolamine_converted/M01/'
-    # m01 = '/media/maligan/My Passport/msc_thesis/data/scopolamine_converted/M01/'
-    m05 = 'data/scopolamine_converted/M05/'
-    # m05 = '/media/maligan/My Passport/msc_thesis/data/scopolamine_converted/M05/'
-    m11 = 'data/scopolamine_converted/M11/'
-    # m11 = '/media/maligan/My Passport/msc_thesis/data/scopolamine_converted/M11/'
+    m01 = 'data/scopolamine/M01/'
+    # m01 = '/media/maligan/My Passport/msc_thesis/data/scopolamine/M01/'
+    m05 = 'data/scopolamine/M05/'
+    # m05 = '/media/maligan/My Passport/msc_thesis/data/scopolamine/M05/'
+    m11 = 'data/scopolamine/M11/'
+    # m11 = '/media/maligan/My Passport/msc_thesis/data/scopolamine/M11/'
 
     dataset, descriptions = [], []
     info = mne.create_info(ch_names=['Fpz-cz', 'Pz-Oz'], ch_types=['eeg']*2, sfreq=1012)
@@ -936,8 +955,8 @@ def load_scopolamine_test_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_si
 def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
     print(':: loading TUH abnormal data')
 
-    data_dir = 'data/tuh_abnormal_data/eval/'
-    # data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
+    # data_dir = 'data/tuh_abnormal_data/eval/'
+    data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
 
     # build data dictionary
     annotations = {}
@@ -951,8 +970,6 @@ def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sampl
                     for raw_path in hf.get_file_list(date):
                         if '_2_channels_reref.fif' in hf.get_id(raw_path):
                             break
-                        else:
-                            pass
                     dates[hf.get_id(date)] = raw_path
                 recordings[hf.get_id(recording)] = dates
             subjects[hf.get_id(subject)] = recordings
@@ -1140,7 +1157,6 @@ def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size
     # create windows
     windows_dataset = create_windows_dataset(dataset, window_size_samples, descriptions, mapping)
 
-    	
     # channel-wise zscore normalization	
     preprocess(windows_dataset, [Preprocessor(zscore)])
 
