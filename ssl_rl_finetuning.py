@@ -126,7 +126,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             annotations = ['healthy', 'epilepsy', 'ASD']
             windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s, window_size_samples, event_mapping={v:k for k,v in enumerate(annotations)}, drop_artifacts=True)
         elif dataset_name == 'scopolamine':
-            annotations = ['M01', 'M05', 'M11']
+            annotations = ['M01', 'M03', 'M05', 'M11']
             windows_dataset = load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         elif dataset_name == 'white_noise':
             annotations = ['abnormal', 'normal', 'white_noise']
@@ -832,8 +832,8 @@ def load_scop_raws(dir_path, info, classification, dataset, descriptions):
         print(f'mat file: {mat}')
         # select columns 3 and 4 (Fpz-Cz, and Pz-Oz respectively) and convert to microvolts
         x = loadmat(dir_path + mat)['RawSignal'][:, [2,3]].T / 1000000 # 1e+6
-        # switch indexes (maybe Pz-Oz, Fpz-Cz...)
-        x = x[::-1]
+        # switch indexes (maybe Pz-Oz, Fz-Cz...)
+        # x = x[::-1]
         raw = mne.io.RawArray(x, info)
         raw = raw.set_annotations(mne.Annotations(onset=[0], duration=raw.times.max(), description=[classification]))
 
@@ -856,9 +856,9 @@ def load_scop_raws(dir_path, info, classification, dataset, descriptions):
         treatment_period = int(mat.split('.')[-1].split('M')[0][1:])
 
         # if even (not placebo)
-        # if not recording&1:
-        raws += [raw]
-        desc += [{'subject': subject, 'recording': recording, 'treatment_period': treatment_period, 'raw': dir_path+mat}]
+        if not treatment_period&1:
+            raws += [raw]
+            desc += [{'subject': subject, 'recording': recording, 'treatment_period': treatment_period, 'raw': dir_path+mat}]
 
         # limiter
         # if i == 5:
@@ -876,6 +876,8 @@ def load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sa
     # 11 measurements times from 0.5 hrs to 8.5 hrs after Scopolamine (or placebo) administration
     m01 = 'data/scopolamine/M01/'
     # m01 = '/media/maligan/My Passport/msc_thesis/data/scopolamine/M01/'
+    m03 = 'data/scopolamine/M03/'
+    # m03 = '/media/maligan/My Passport/msc_thesis/data/scopolamine/M03/'
     m05 = 'data/scopolamine/M05/'
     # m05 = '/media/maligan/My Passport/msc_thesis/data/scopolamine/M05/'
     m11 = 'data/scopolamine/M11/'
@@ -885,18 +887,18 @@ def load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sa
     info = mne.create_info(ch_names=['Fpz-cz', 'Pz-Oz'], ch_types=['eeg']*2, sfreq=1012)
 
     dataset, descriptions = load_scop_raws(m01, info, 'm01', dataset, descriptions)
+    dataset, descriptions = load_scop_raws(m01, info, 'm03', dataset, descriptions)
     dataset, descriptions = load_scop_raws(m05, info, 'm05', dataset, descriptions)
     dataset, descriptions = load_scop_raws(m11, info, 'm11', dataset, descriptions)
-
-
 
     # preprocess dataset
     # dataset = preprocess_raws(dataset, sfreq, low_cut_hz, high_cut_hz, n_jobs)
 
     mapping = {
-        'm01': 0,
-        'm05': 1,
-        'm11': 2
+        'M01': 0,
+        'M03': 1,
+        'M05': 2,
+        'M11': 3
     }
 
     # shuffle raw_paths and descriptions
