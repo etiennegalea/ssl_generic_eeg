@@ -112,25 +112,25 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
     if load_feature_vectors is None:
         if dataset_name == 'sleep_staging':
             annotations = ['W', 'N1', 'N2', 'N3', 'R']
-            windows_dataset = load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq)
+            windows_dataset, stats = load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq)
         elif dataset_name == 'bci':
             annotations = ['T0', 'T1', 'T2']
-            windows_dataset = load_bci_data(subject_size, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
+            windows_dataset, stats = load_bci_data(subject_size, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         elif dataset_name == 'tuh_abnormal':
             annotations = ['abnormal', 'normal']
-            windows_dataset = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
+            windows_dataset, stats = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         elif dataset_name == 'space_bambi':
             # annotations = ['artifact', 'non-artifact', 'ignored']
             # annotations = ['open', 'closed']
             # desc = 'disorder'
             annotations = ['healthy', 'epilepsy', 'ASD']
-            windows_dataset = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s, window_size_samples, event_mapping={v:k for k,v in enumerate(annotations)}, drop_artifacts=True)
+            windows_dataset, stats = load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s, window_size_samples, event_mapping={v:k for k,v in enumerate(annotations)}, drop_artifacts=True)
         elif dataset_name == 'scopolamine':
             annotations = ['M01', 'M03', 'M05', 'M11']
-            windows_dataset = load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
+            windows_dataset, stats = load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         elif dataset_name == 'white_noise':
             annotations = ['abnormal', 'normal', 'white_noise']
-            windows_dataset = load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
+            windows_dataset, stats = load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         elif dataset_name == 'tuar':
             # annotations = ['eyem', 'chew', 'shiv', 'musc', 'elec']
             # annotations = [
@@ -144,7 +144,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
             #     'musc_elec', 'shiv'
             # ]
             annotations = ['artifact', 'non-artifact', 'ignored']
-            windows_dataset = load_tuar_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
+            windows_dataset, stats = load_tuar_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
 
         n_classes = len(annotations)
         # print all parameter vars
@@ -602,6 +602,18 @@ def conf_matrix_class_report(model, dataloader, n_classes, device='cpu'):
 		torch.set_printoptions(sci_mode=False)
 		return confusion_matrix, class_report
 
+def extract_stats(windows_dataset, mapping):
+    # count #samples per class
+    stats = {v:0 for k,v in mapping.items()}
+    for x in windows_dataset.datasets:
+        for sample in x.y:
+            stats[sample] = stats[sample]+1
+    # rename stats keys
+    for i, k in enumerate(mapping.keys()):
+        stats[k] = stats.pop(list(mapping.values())[i])
+
+    return stats
+
 # ---------------------------------- LOADING DATASETS ----------------------------------
 
 
@@ -722,7 +734,7 @@ def load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_sample
     ### Preprocessing windows
     preprocess(windows_dataset, [Preprocessor(zscore)])
 
-    return windows_dataset
+    return windows_dataset, extract_stats(windows_dataset, mapping)
 
 
 def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s, window_size_samples, event_mapping={0: 'artifact', 1: 'non-artifact', 2:'ignore'}, drop_artifacts=False):
@@ -817,7 +829,7 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s,
     # channel-wise zscore normalization
     preprocess(windows_dataset, [Preprocessor(zscore)])
 
-    return windows_dataset
+    return windows_dataset, extract_stats(windows_dataset, mapping)
 
 
 
@@ -861,8 +873,8 @@ def load_scop_raws(dir_path, info, classification, dataset, descriptions):
             desc += [{'subject': subject, 'recording': recording, 'treatment_period': treatment_period, 'raw': dir_path+mat}]
 
         # limiter
-        # if i == 5:
-        #     break
+        if i == 5:
+            break
 
     dataset += raws
     descriptions += desc
@@ -872,6 +884,8 @@ def load_scop_raws(dir_path, info, classification, dataset, descriptions):
 # load scopolamine data
 def load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
     print(':: loading SCOPOLAMINE data')
+
+    stats = {}
 
     # 11 measurements times from 0.5 hrs to 8.5 hrs after Scopolamine (or placebo) administration
     m01 = 'data/scopolamine/M01/'
@@ -884,12 +898,12 @@ def load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sa
     # m11 = '/media/maligan/My Passport/msc_thesis/data/scopolamine/M11/'
 
     dataset, descriptions = [], []
-    info = mne.create_info(ch_names=['Fpz-cz', 'Pz-Oz'], ch_types=['eeg']*2, sfreq=1012)
+    info = mne.create_info(ch_names=['Fz-cz', 'Pz-Oz'], ch_types=['eeg']*2, sfreq=1012)
 
-    dataset, descriptions = load_scop_raws(m01, info, 'm01', dataset, descriptions)
-    dataset, descriptions = load_scop_raws(m01, info, 'm03', dataset, descriptions)
-    dataset, descriptions = load_scop_raws(m05, info, 'm05', dataset, descriptions)
-    dataset, descriptions = load_scop_raws(m11, info, 'm11', dataset, descriptions)
+    dataset, descriptions = load_scop_raws(m01, info, 'M01', dataset, descriptions)
+    dataset, descriptions = load_scop_raws(m01, info, 'M03', dataset, descriptions)
+    dataset, descriptions = load_scop_raws(m05, info, 'M05', dataset, descriptions)
+    dataset, descriptions = load_scop_raws(m11, info, 'M11', dataset, descriptions)
 
     # preprocess dataset
     # dataset = preprocess_raws(dataset, sfreq, low_cut_hz, high_cut_hz, n_jobs)
@@ -911,47 +925,8 @@ def load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sa
 
     # channel-wise zscore normalization
     preprocess(windows_dataset, [Preprocessor(zscore)])
-    
-    return windows_dataset
 
-
-# load scopolamine data
-def load_scopolamine_test_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
-    print(':: loading SCOPOLAMINE data')
-
-    # 11 measurements times from 0.5 hrs to 8.5 hrs after Scopolamine (or placebo) administration
-    m01 = 'data/scopolamine/M01/'
-    # m01 = '/media/maligan/My Passport/msc_thesis/data/scopolamine/M01/'
-    m11 = 'data/scopolamine/M11/'
-    # m11 = '/media/maligan/My Passport/msc_thesis/data/scopolamine/M11/'
-
-    dataset, descriptions = [], []
-    info = mne.create_info(ch_names=['Fpz-cz', 'Pz-Oz'], ch_types=['eeg']*2, sfreq=1012)
-
-    dataset, descriptions = load_scop_raws(m01, info, 'm01', dataset, descriptions)
-    dataset, descriptions = load_scop_raws(m11, info, 'm11', dataset, descriptions, test=True)
-    
-
-    # preprocess dataset
-    dataset = preprocess_raws(dataset, sfreq, low_cut_hz, high_cut_hz, n_jobs)
-
-    mapping = {
-        'm01': 0,
-        'm11': 1,
-    }
-
-    # shuffle raw_paths and descriptions
-    # from sklearn.utils import shuffle
-    # dataset, descriptions = shuffle(dataset, descriptions)
-
-
-    # create windows
-    windows_dataset = create_windows_dataset(dataset, window_size_samples, descriptions, mapping)
-
-    # channel-wise zscore normalization
-    preprocess(windows_dataset, [Preprocessor(zscore)])
-
-    return windows_dataset
+    return windows_dataset, extract_stats(windows_dataset, mapping)
 
 
 def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
@@ -1034,7 +1009,7 @@ def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sampl
     # channel-wise zscore normalization
     preprocess(windows_dataset, [Preprocessor(zscore)])
 
-    return windows_dataset
+    return windows_dataset, extract_stats(windows_dataset, mapping)
 
 
 # load simulated noisy signals (white noise and sin waves with normal noise) for testing model
@@ -1061,7 +1036,7 @@ def load_generated_noisy_signals(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_
     # channel-wise zscore normalization
     preprocess(windows_dataset, [Preprocessor(zscore)])
 
-    return windows_dataset
+    return windows_dataset, extract_stats(windows_dataset, mapping)
 
 
 def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
@@ -1162,7 +1137,7 @@ def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size
     # channel-wise zscore normalization	
     preprocess(windows_dataset, [Preprocessor(zscore)])
 
-    return windows_dataset
+    return windows_dataset, extract_stats(windows_dataset, mapping)
 
 
 def load_tuar_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s):
@@ -1245,7 +1220,7 @@ def load_tuar_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s):
     # #     'musc_elec': 11, 'shiv': 12
     # # }
 
-    return windows_dataset
+    return windows_dataset, extract_stats(windows_dataset, mapping)
 
 
 
