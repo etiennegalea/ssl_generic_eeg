@@ -627,7 +627,7 @@ def main(dataset_name, subject_size_percent, random_state, n_jobs, window_size_s
 
     # classification report
     class_report = classification_report(y_true, y_pred)
-    print(classification_report(y_true, y_pred, labels=annotations))
+    print(classification_report(y_true, y_pred))
     # save report
     dir = './classification_reports/pretrained/'
     hf.check_dir(dir)
