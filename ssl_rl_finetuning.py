@@ -54,7 +54,7 @@ from segment_tuar import Segmenter_TUAR
 
 ### Load model
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='white_noise', help='Dataset for downstream task: \
+@click.option('--dataset_name', '--dataset', '-n', default='space_bambi', help='Dataset for downstream task: \
     "space_bambi", "sleep_staging", "tuh_abnormal", "scopolamine", "white_noise", "bci, "tuar".')
 @click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
 # @click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
@@ -766,25 +766,26 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s,
     from sklearn.utils import shuffle
     raws, descriptions = shuffle(raws, descriptions)
 
-    # # limit number of instances to min of all classes (for balanced dataset)
-    # n_classes = len(np.unique([record['disorder'] for record in descriptions]))
-    # counts = [0 for i in range(n_classes)]
-    # for x in descriptions:
-    #     counts[x['disorder']] += 1
-    # limiter = np.min(counts)
+    # limit number of instances to min of all classes (for balanced dataset)
+    n_classes = len(np.unique([record['disorder'] for record in descriptions]))
+    counts = [0 for i in range(n_classes)]
+    for x in descriptions:
+        counts[x['disorder']] += 1
+    limiter = np.min(counts)
+    print(f':: limiter: {limiter}')
 
-    # # reinit counts
-    # counts = [0 for i in range(n_classes)]
-    # new_raws, new_descriptions = [], []
-    # # load raws according to limiter
-    # for i, path in enumerate(os.listdir(data_dir)):
-    #     if counts[descriptions[i]['disorder']] <= limiter:
-    #         full_path = os.path.join(data_dir, path)
-    #         new_raws += [raws[i]]
-    #         new_descriptions += [descriptions[i]]
-    #     counts[descriptions[i]['disorder']] += 1
-    # descriptions = new_descriptions
-    # raws = new_raws
+    # reinit counts
+    counts = [0 for i in range(n_classes)]
+    new_raws, new_descriptions = [], []
+    # load raws according to limiter
+    for i, path in enumerate(os.listdir(data_dir)):
+        if counts[descriptions[i]['disorder']] <= limiter:
+            full_path = os.path.join(data_dir, path)
+            new_raws += [raws[i]]
+            new_descriptions += [descriptions[i]]
+        counts[descriptions[i]['disorder']] += 1
+    descriptions = new_descriptions
+    raws = new_raws
 
     # preprocess dataset
     dataset = preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs)
@@ -932,8 +933,8 @@ def load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sa
 def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples):
     print(':: loading TUH abnormal data')
 
-    data_dir = 'data/tuh_abnormal_data/eval/'
-    # data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
+    # data_dir = 'data/tuh_abnormal_data/eval/'
+    data_dir = '/media/maligan/My Passport/msc_thesis/data/tuh_abnormal_data/eval/'
 
     # build data dictionary
     annotations = {}
