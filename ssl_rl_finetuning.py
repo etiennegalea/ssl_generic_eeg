@@ -54,7 +54,7 @@ from segment_tuar import Segmenter_TUAR
 
 ### Load model
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='space_bambi', help='Dataset for downstream task: \
+@click.option('--dataset_name', '--dataset', '-n', default='tuh_abnormal', help='Dataset for downstream task: \
     "space_bambi", "sleep_staging", "tuh_abnormal", "scopolamine", "white_noise", "bci, "tuar".')
 @click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
 # @click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
@@ -102,8 +102,8 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         print(f":: loading the latest pretrained model: {latest}")
         model = torch.load(f"{model_dir}{latest}.model")
     else:
-        # model = torch.load("models/pretrained/2022_02_08__16_16_sleep_staging_2s_windows_83_subjects_cpu_25_epochs_100hz.model")
-        model = torch.load("models/pretrained/2021_12_16__10_23_49_sleep_staging_5s_windows_83_subjects_cpu_15_epochs_100hz.model")
+        model = torch.load("models/pretrained/2022_04_12__01_04_sleep_staging_5s_windows_83%_subjects_cpu_25_epochs_100hz_10_dim.model")
+        # model = torch.load("models/pretrained/2021_12_16__10_23_49_sleep_staging_5s_windows_83_subjects_cpu_15_epochs_100hz.model")
         # model = torch.load("models/pretrained/2022_01_31__12_02_47_sleep_staging_5s_windows_5_subjects_cpu_15_epochs_100hz.model")
 
     print(model)
