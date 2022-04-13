@@ -320,10 +320,10 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
     p.plot_PCA(X, y, annotations)
     p.plot_TSNE(X, y, annotations)
     p.plot_UMAP(X, y, annotations)
-    if connectivity_plot:
-        p.plot_UMAP_connectivity(X)
-    if edge_bundling_plot:
-        p.plot_UMAP_connectivity(X, edge_bundling=True)
+    # if connectivity_plot:
+    #     p.plot_UMAP_connectivity(X)
+    # if edge_bundling_plot:
+    #     p.plot_UMAP_connectivity(X, edge_bundling=True)
     p.plot_UMAP_3d(X, y, annotations)
 
 
@@ -332,11 +332,11 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
     p_fs.plot_PCA(X_raw, y_raw, annotations)
     p_fs.plot_TSNE(X_raw, y_raw, annotations)
     p_fs.plot_UMAP(X_raw, y_raw, annotations)
-    if connectivity_plot:
-        p_fs.plot_UMAP_connectivity(X_raw)
-    if edge_bundling_plot:
-        p_fs.plot_UMAP_connectivity(X_raw, edge_bundling=True)
-    p_fs.plot_UMAP_3d(X_raw, y_raw, annotations)
+    # if connectivity_plot:
+    #     p_fs.plot_UMAP_connectivity(X_raw)
+    # if edge_bundling_plot:
+    #     p_fs.plot_UMAP_connectivity(X_raw, edge_bundling=True)
+    # p_fs.plot_UMAP_3d(X_raw, y_raw, annotations)
 
 
 

@@ -18,6 +18,7 @@ import mne
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
+from torchsummary import summary
 from braindecode.datasets.sleep_physionet import SleepPhysionet
 from braindecode.datasets import BaseConcatDataset, BaseDataset
 from braindecode.datautil.preprocess import preprocess, Preprocessor
@@ -462,10 +463,6 @@ def main(dataset_name, subject_size_percent, random_state, n_jobs, window_size_s
 
     dataset_path = fetch_dataset_path(dataset_name)
 
-    # print all parameter vars
-    setup = tabulate(locals().items(), tablefmt='fancy_grid') 
-    print(setup)
-
     metadata_string = f'{dataset_name}_{window_size_s}s_windows_{device}_{n_epochs}_epochs_{sfreq}hz'
 
     # if no windowed_data is specified, download it and preprocess it
@@ -501,12 +498,6 @@ def main(dataset_name, subject_size_percent, random_state, n_jobs, window_size_s
             pickle.dump(windows_dataset, f)
         f.close()
         print(':: Data loaded, preprocessed and windowed.')
-
-    # write setup to file
-    dir = './setup/pretrained/'
-    hf.check_dir(dir)
-    with open(f'{dir}{hf.get_datetime()}_setup_{metadata_string}.txt', "w") as f:
-        f.write(pprint.pformat(setup, indent=4, sort_dicts=False))
 
     print(':: starting training...')
 
@@ -552,25 +543,28 @@ def main(dataset_name, subject_size_percent, random_state, n_jobs, window_size_s
     n_channels, input_size_samples = windows_dataset[0][0].shape
     print(f':: number of channels: {n_channels}\n:: input size samples: {input_size_samples}')
 
-    linear_output = 15
+    linear_output = 10
 
     emb = SleepStagerChambon2018(
         n_channels,
         sfreq,
         n_classes=emb_size,
         n_conv_chs=16,
+        pad_size_s=0.125,
         input_size_s=input_size_samples / sfreq,
         dropout=0,
         apply_batch_norm=True
     )
     model = ContrastiveNet(emb, linear_output).to(device)
 
+    model_summary = summary(model.emb, (1,2,500), device='cpu')
+    print(model_summary)
+
     # output features to #linear_output
     model.emb.fc = nn.Sequential(
     nn.Dropout(0.25),
     nn.Linear(model.emb._len_last_layer(2, input_size_samples), linear_output)
 )
-
 
     cp = Checkpoint(dirname='', f_criterion=None, f_optimizer=None, f_history=None)
     early_stopping = EarlyStopping(patience=10)
@@ -602,6 +596,17 @@ def main(dataset_name, subject_size_percent, random_state, n_jobs, window_size_s
         callbacks=callbacks,
         device=device
     )
+
+    # print all parameter vars
+    setup = tabulate(locals().items(), tablefmt='fancy_grid') 
+    print(setup)
+    # write setup to file
+    dir = './setup/pretrained/'
+    hf.check_dir(dir)
+    with open(f'{dir}{hf.get_datetime()}_setup_{metadata_string}.txt', "w") as f:
+        f.write(pprint.pformat(setup, indent=4, sort_dicts=False))
+
+
     # Model training for a specified number of epochs. `y` is None as it is already
     # supplied in the dataset.
     clf.fit(splitted['train'], y=None)
