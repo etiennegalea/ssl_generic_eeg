@@ -609,8 +609,8 @@ def extract_stats(windows_dataset, mapping):
         for sample in x.y:
             stats[sample] = stats[sample]+1
     # rename stats keys
-    for i, k in enumerate(mapping.keys()):
-        stats[k] = stats.pop(list(mapping.values())[i])
+    # for i, k in enumerate(mapping.keys()):
+        # stats[k] = stats.pop(list(mapping.values())[i])
 
     return stats
 
@@ -1113,7 +1113,7 @@ def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size
     # -------------------- NOISE GEN --------------------------------
 
     for i in range(len(raw_paths)):
-        dataset += [hf.generate_white_noise_raws(n_times=500)]
+        dataset += [hf.generate_white_noise_raws(n_times=75000)]
         descriptions += [{'subject': i}]
 
     # ---------------------------------------------------------------
