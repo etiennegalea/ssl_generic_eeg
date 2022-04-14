@@ -348,7 +348,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         n_channels, input_size_samples = windows_dataset[0][0].shape
 
 
-        linear_output = 15
+        linear_output = 20
 
         model_summary = summary(model.emb, (1,2,500), device='cpu')
         print(model_summary)
