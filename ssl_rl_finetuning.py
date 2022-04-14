@@ -16,6 +16,7 @@ import mne
 import torch
 from torch import nn
 import torch.optim as optim
+from torchsummary import summary
 from torch.utils.data import DataLoader, SubsetRandomSampler
 from braindecode.datasets.sleep_physionet import SleepPhysionet
 from braindecode.datasets.base import BaseConcatDataset, BaseDataset, WindowsDataset
@@ -346,14 +347,26 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
 
         n_channels, input_size_samples = windows_dataset[0][0].shape
 
+
+        linear_output = 15
+
+        model_summary = summary(model.emb, (1,2,500), device='cpu')
+        print(model_summary)
+
         fs_model = SleepStagerChambon2018(
             n_channels,
             sfreq,
             n_classes=n_classes,
             n_conv_chs=16,
+            pad_size_s=0.125,
             input_size_s=input_size_samples / sfreq,
             dropout=0,
             apply_batch_norm=True
+        )
+        # output features to #linear_output
+        model.emb.fc = nn.Sequential(
+            nn.Dropout(0.25),
+            nn.Linear(model.emb._len_last_layer(2, input_size_samples), linear_output)
         )
         print(fs_model)
 

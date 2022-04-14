@@ -557,14 +557,14 @@ def main(dataset_name, subject_size_percent, random_state, n_jobs, window_size_s
     )
     model = ContrastiveNet(emb, linear_output).to(device)
 
-    model_summary = summary(model.emb, (1,2,500), device='cpu')
-    print(model_summary)
-
     # output features to #linear_output
     model.emb.fc = nn.Sequential(
-    nn.Dropout(0.25),
-    nn.Linear(model.emb._len_last_layer(2, input_size_samples), linear_output)
-)
+        nn.Dropout(0.25),
+        nn.Linear(model.emb._len_last_layer(2, input_size_samples), linear_output)
+    )
+
+    model_summary = summary(model.emb, (1,2,500), device='cpu')
+    print(model_summary)
 
     cp = Checkpoint(dirname='', f_criterion=None, f_optimizer=None, f_history=None)
     early_stopping = EarlyStopping(patience=10)
