@@ -543,7 +543,7 @@ def main(dataset_name, subject_size_percent, random_state, n_jobs, window_size_s
     n_channels, input_size_samples = windows_dataset[0][0].shape
     print(f':: number of channels: {n_channels}\n:: input size samples: {input_size_samples}')
 
-    linear_output = 20
+    linear_output = 25
 
     emb = SleepStagerChambon2018(
         n_channels,
@@ -559,7 +559,7 @@ def main(dataset_name, subject_size_percent, random_state, n_jobs, window_size_s
 
     # output features to #linear_output
     model.emb.fc = nn.Sequential(
-        nn.Dropout(0.25),
+        # nn.Dropout(0.25),
         nn.Linear(model.emb._len_last_layer(2, input_size_samples), linear_output)
     )
 

@@ -348,7 +348,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         n_channels, input_size_samples = windows_dataset[0][0].shape
 
 
-        linear_output = 20
+        linear_output = 25
 
         model_summary = summary(model.emb, (1,2,500), device='cpu')
         print(model_summary)
@@ -365,7 +365,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         )
         # output features to #linear_output
         model.emb.fc = nn.Sequential(
-            nn.Dropout(0.25),
+            # nn.Dropout(0.25),
             nn.Linear(model.emb._len_last_layer(2, input_size_samples), linear_output)
         )
         print(fs_model)
