@@ -103,7 +103,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
         print(f":: loading the latest pretrained model: {latest}")
         model = torch.load(f"{model_dir}{latest}.model")
     else:
-        model = torch.load("models/pretrained/2022_04_12__01_04_sleep_staging_5s_windows_83%_subjects_cpu_25_epochs_100hz.model")   # 10-dim
+        model = torch.load("models/pretrained/2022_04_14__14_32_sleep_staging_5s_windows_83%_subjects_cpu_25_epochs_100hz.model")   # 10-dim
         # model = torch.load("models/pretrained/2021_12_16__10_23_49_sleep_staging_5s_windows_83_subjects_cpu_15_epochs_100hz.model")
         # model = torch.load("models/pretrained/2022_01_31__12_02_47_sleep_staging_5s_windows_5_subjects_cpu_15_epochs_100hz.model")
 
