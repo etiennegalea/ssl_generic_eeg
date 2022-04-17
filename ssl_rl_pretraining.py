@@ -519,10 +519,10 @@ def main(dataset_name, subject_size_percent, random_state, n_jobs, window_size_s
 
     ### Creating samplers
 
-    tau_pos, tau_neg = int(sfreq * 60), int(sfreq * 15 * 60)
-    n_examples_train = 250 * len(splitted['train'].datasets)
-    n_examples_valid = 250 * len(splitted['valid'].datasets)
-    n_examples_test = 250 * len(splitted['test'].datasets)
+    tau_pos, tau_neg = int(sfreq * 4 * 60), int(sfreq * 15 * 60)
+    n_examples_train = 2000 * len(splitted['train'].datasets)
+    n_examples_valid = 2000 * len(splitted['valid'].datasets)
+    n_examples_test = 2000 * len(splitted['test'].datasets)
 
     train_sampler = RelativePositioningSampler(
         splitted['train'].get_metadata(), tau_pos=tau_pos, tau_neg=tau_neg,
