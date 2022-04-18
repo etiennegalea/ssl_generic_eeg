@@ -55,10 +55,10 @@ from segment_tuar import Segmenter_TUAR
 
 ### Load model
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='tuh_abnormal', help='Dataset for downstream task: \
+@click.option('--dataset_name', '--dataset', '-n', default='sleep_staging', help='Dataset for downstream task: \
     "space_bambi", "sleep_staging", "tuh_abnormal", "scopolamine", "white_noise", "bci, "tuar".')
 @click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
-# @click.option('--subject_size', nargs=2, default=[1,10], type=int, help='Number of subjects to be trained - max 110.')
+@click.option('--subject_size_n', default=10, help='0-n')
 @click.option('--random_state', default=87, help='Set a static random state so that the same result is generated everytime.')
 @click.option('--n_jobs', default=1, help='Number of subprocesses to run.')
 @click.option('--window_size_s', default=5, help='Window sizes in seconds.')
@@ -80,7 +80,7 @@ from segment_tuar import Segmenter_TUAR
 
 
 
-def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cut_hz, high_cut_hz, sfreq, lr, n_epochs, batch_size, n_channels, connectivity_plot, edge_bundling_plot, plot_heavy, show_plots, load_feature_vectors, load_latest_model, fully_supervised, cv):
+def main(dataset_name, subject_size, subject_size_n, random_state, n_jobs, window_size_s, low_cut_hz, high_cut_hz, sfreq, lr, n_epochs, batch_size, n_channels, connectivity_plot, edge_bundling_plot, plot_heavy, show_plots, load_feature_vectors, load_latest_model, fully_supervised, cv):
     print(':: STARTING MAIN ::')
     
     # clustering according to description (init)
@@ -115,7 +115,7 @@ def main(dataset_name, subject_size, random_state, n_jobs, window_size_s, low_cu
     if load_feature_vectors is None:
         if dataset_name == 'sleep_staging':
             annotations = ['W', 'N1', 'N2', 'N3', 'R']
-            windows_dataset, stats = load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq)
+            windows_dataset, stats = load_sleep_staging_windowed_dataset(subject_size_n, n_jobs, window_size_samples, high_cut_hz, sfreq)
         elif dataset_name == 'bci':
             annotations = ['T0', 'T1', 'T2']
             windows_dataset, stats = load_bci_data(subject_size, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
@@ -704,17 +704,17 @@ def load_bci_data(subject_size, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_s
     return windows_dataset
 
 
-def load_sleep_staging_windowed_dataset(subject_size, n_jobs, window_size_samples, high_cut_hz, sfreq):
+def load_sleep_staging_windowed_dataset(subject_size_n, n_jobs, window_size_samples, high_cut_hz, sfreq):
     print(f':: loading SLEEP STAGING data...')
 
-    subjects = {
-        'sample': [*range(5)],
-        'some': [*range(0,40)],
-        'all': [*range(0,83)],
-    }
+    # subjects = {
+    #     'sample': [*range(5)],
+    #     'some': [*range(0,40)],
+    #     'all': [*range(0,83)],
+    # }
 
     dataset = SleepPhysionet(
-        subject_ids=subjects[subject_size],
+        subject_ids=[*range(subject_size_n)],
         recording_ids=[1],
         crop_wake_mins=30,
         load_eeg_only=True,
@@ -781,26 +781,26 @@ def load_space_bambi_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_s,
     from sklearn.utils import shuffle
     raws, descriptions = shuffle(raws, descriptions)
 
-    # limit number of instances to min of all classes (for balanced dataset)
-    n_classes = len(np.unique([record['disorder'] for record in descriptions]))
-    counts = [0 for i in range(n_classes)]
-    for x in descriptions:
-        counts[x['disorder']] += 1
-    limiter = np.min(counts)
-    print(f':: limiter: {limiter}')
+    # # limit number of instances to min of all classes (for balanced dataset)
+    # n_classes = len(np.unique([record['disorder'] for record in descriptions]))
+    # counts = [0 for i in range(n_classes)]
+    # for x in descriptions:
+    #     counts[x['disorder']] += 1
+    # limiter = np.min(counts)
+    # print(f':: limiter: {limiter}')
 
-    # reinit counts
-    counts = [0 for i in range(n_classes)]
-    new_raws, new_descriptions = [], []
-    # load raws according to limiter
-    for i, path in enumerate(os.listdir(data_dir)):
-        if counts[descriptions[i]['disorder']] <= limiter:
-            full_path = os.path.join(data_dir, path)
-            new_raws += [raws[i]]
-            new_descriptions += [descriptions[i]]
-        counts[descriptions[i]['disorder']] += 1
-    descriptions = new_descriptions
-    raws = new_raws
+    # # reinit counts
+    # counts = [0 for i in range(n_classes)]
+    # new_raws, new_descriptions = [], []
+    # # load raws according to limiter
+    # for i, path in enumerate(os.listdir(data_dir)):
+    #     if counts[descriptions[i]['disorder']] <= limiter:
+    #         full_path = os.path.join(data_dir, path)
+    #         new_raws += [raws[i]]
+    #         new_descriptions += [descriptions[i]]
+    #     counts[descriptions[i]['disorder']] += 1
+    # descriptions = new_descriptions
+    # raws = new_raws
 
     # preprocess dataset
     dataset = preprocess_raws(raws, sfreq, low_cut_hz, high_cut_hz, n_jobs)
@@ -859,7 +859,7 @@ def load_scop_raws(dir_path, info, classification, dataset, descriptions):
         # ---
         print(f'mat file: {mat}')
         # select columns 3 and 4 (Fpz-Cz, and Pz-Oz respectively) and convert to microvolts
-        x = loadmat(dir_path + mat)['RawSignal'][:, [2,3]].T / 1000000 # 1e+6
+        x = loadmat(dir_path + mat)['RawSignal'][:, [2,3]].T * 1e6
         # switch indexes (maybe Pz-Oz, Fz-Cz...)
         # x = x[::-1]
         raw = mne.io.RawArray(x, info)
@@ -999,9 +999,9 @@ def load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_sampl
     raw_paths, descriptions, classification = shuffle(raw_paths, descriptions, classification)
 
     # limiters
-    raw_paths = raw_paths[:40]
-    descriptions = descriptions[:40]
-    classification = classification[:40]
+    raw_paths = raw_paths[:100]
+    descriptions = descriptions[:100]
+    classification = classification[:100]
 
     # load data and set annotations
     dataset = []
@@ -1111,11 +1111,11 @@ def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size
     from sklearn.utils import shuffle
     dataset, descriptions, classification = shuffle(raw_paths, descriptions, classification)
 
-
+    limiter = 100
     # limiters
-    raw_paths = raw_paths[:40]
-    descriptions = descriptions[:40]
-    classification = classification[:40]
+    raw_paths = raw_paths[:limiter]
+    descriptions = descriptions[:limiter]
+    classification = classification[:limiter]
 
     # load data and set annotations
     dataset = []
@@ -1128,7 +1128,7 @@ def load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size
     # -------------------- NOISE GEN --------------------------------
 
     for i in range(len(raw_paths)):
-        dataset += [hf.generate_white_noise_raws(n_times=75000)]
+        dataset += [hf.generate_white_noise_raws(n_times = limiter*1875)]
         descriptions += [{'subject': i}]
 
     # ---------------------------------------------------------------
