@@ -148,6 +148,14 @@ class Plot:
         n_stages = len(annotations)
 
         fig, ax = plt.subplots()
+
+        # remove top/right axis spines
+        ax.spines['right'].set_visible(False)
+        ax.spines['top'].set_visible(False)
+        # remove x/y tick labels
+        plt.xticks([])
+        plt.yticks([])
+
         colors = cm.get_cmap('plasma', n_stages)(range(n_stages))
         # if annotating feature space with descriptions instead
         if len(descriptions) > 0 or mapping is not None:
@@ -250,7 +258,7 @@ class Plot:
             raw_test_scores_mean - raw_test_scores_std,
             raw_test_scores_mean + raw_test_scores_std,
             alpha=0.1,
-            color="#abd9e9",
+            color="#2b83ba",
         )
 
         # plt.ylim(0, 1)
@@ -259,7 +267,7 @@ class Plot:
 
         # plt.title(f'Balanced accuracy per training example for {dataset_name} dataset', fontsize=26)
         plt.plot(train_sizes, ssl_test_scores_mean, '-', color='#d7191c', label='SSL')
-        plt.plot(train_sizes, raw_test_scores_mean, '-', color='#abd9e9', label='FS')
+        plt.plot(train_sizes, raw_test_scores_mean, '-', color='#2b83ba', label='FS')
         # plt.legend(loc="best")
 
         self._plot(plt, 'learning_curves')

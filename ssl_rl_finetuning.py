@@ -55,8 +55,8 @@ from segment_tuar import Segmenter_TUAR
 
 ### Load model
 @click.command()
-@click.option('--dataset_name', '--dataset', '-n', default='sleep_staging', help='Dataset for downstream task: \
-    "space_bambi", "sleep_staging", "tuh_abnormal", "scopolamine", "white_noise", "bci, "tuar".')
+@click.option('--dataset_name', '--dataset', '-n', default='tuab', help='Dataset for downstream task: \
+    "space_bambi", "sleep_staging", "tuab", "scopolamine", "tuab_white_noise", "bci, "tuar".')
 @click.option('--subject_size', default='sample', help='sample (0-5), some (0-40), all (83)')
 @click.option('--subject_size_n', default=10, help='0-n')
 @click.option('--random_state', default=87, help='Set a static random state so that the same result is generated everytime.')
@@ -119,7 +119,7 @@ def main(dataset_name, subject_size, subject_size_n, random_state, n_jobs, windo
         elif dataset_name == 'bci':
             annotations = ['T0', 'T1', 'T2']
             windows_dataset, stats = load_bci_data(subject_size, sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
-        elif dataset_name == 'tuh_abnormal':
+        elif dataset_name == 'tuab':
             annotations = ['abnormal', 'normal']
             windows_dataset, stats = load_abnormal_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         elif dataset_name == 'space_bambi':
@@ -131,7 +131,7 @@ def main(dataset_name, subject_size, subject_size_n, random_state, n_jobs, windo
         elif dataset_name == 'scopolamine':
             annotations = ['M01', 'M03', 'M05', 'M11']
             windows_dataset, stats = load_scopolamine_data(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
-        elif dataset_name == 'white_noise':
+        elif dataset_name == 'tuab_white_noise':
             annotations = ['abnormal', 'normal', 'white_noise']
             windows_dataset, stats = load_abnormal_noise_raws(sfreq, low_cut_hz, high_cut_hz, n_jobs, window_size_samples)
         elif dataset_name == 'tuar':
