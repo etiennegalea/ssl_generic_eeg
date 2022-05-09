@@ -243,14 +243,14 @@ class Plot:
             ssl_test_scores_mean - ssl_test_scores_std,
             ssl_test_scores_mean + ssl_test_scores_std,
             alpha=0.1,
-            color="r",
+            color="#d7191c",
         )
         ax.fill_between(
             train_sizes,
             raw_test_scores_mean - raw_test_scores_std,
             raw_test_scores_mean + raw_test_scores_std,
             alpha=0.1,
-            color="g",
+            color="#abd9e9",
         )
 
         # plt.ylim(0, 1)
@@ -258,8 +258,8 @@ class Plot:
         ax.set_ylabel(scoring)
 
         # plt.title(f'Balanced accuracy per training example for {dataset_name} dataset', fontsize=26)
-        plt.plot(train_sizes, ssl_test_scores_mean, '-', color='r', label='SSL')
-        plt.plot(train_sizes, raw_test_scores_mean, '-', color='g', label='FS')
+        plt.plot(train_sizes, ssl_test_scores_mean, '-', color='#d7191c', label='SSL')
+        plt.plot(train_sizes, raw_test_scores_mean, '-', color='#abd9e9', label='FS')
         # plt.legend(loc="best")
 
         self._plot(plt, 'learning_curves')
