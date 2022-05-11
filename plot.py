@@ -110,7 +110,7 @@ class Plot:
             mask = y == i
             ax.scatter(components[mask, 0], components[mask, 1], s=1, alpha=0.4,
                     color=colors[i], label=stage)
-        ax.legend()
+        ax.legend(markerscale=2, fontsize=20)
 
         ax.set_title(f'PCA of {self.dataset_name} dataset')
 
@@ -132,7 +132,7 @@ class Plot:
             mask = y == i
             ax.scatter(components[mask, 0], components[mask, 1], s=1, alpha=0.4,
                     color=colors[i], label=stage)
-        ax.legend()
+        ax.legend(markerscale=2, fontsize=20)
 
         ax.set_title(f't-SNE of {self.dataset_name} dataset')
 
@@ -165,7 +165,7 @@ class Plot:
             mask = y == i
             ax.scatter(umap_components[mask, 0], umap_components[mask, 1], s=1, alpha=0.4,
             color=colors[i], label=stage)
-        ax.legend()
+        ax.legend(markerscale=2, fontsize=20)
 
         ax.set_title(f'UMAP of {self.dataset_name} dataset')
 
@@ -246,19 +246,19 @@ class Plot:
         _, ax = plt.subplots(1, 1, figsize=(20, 10))
         ax.grid()
 
-        ax.fill_between(
+        ax.fill_between(    
             train_sizes,
             ssl_test_scores_mean - ssl_test_scores_std,
             ssl_test_scores_mean + ssl_test_scores_std,
             alpha=0.1,
-            color="#d7191c",
+            color="#117733",
         )
         ax.fill_between(
             train_sizes,
             raw_test_scores_mean - raw_test_scores_std,
             raw_test_scores_mean + raw_test_scores_std,
             alpha=0.1,
-            color="#2b83ba",
+            color="#328",
         )
 
         # plt.ylim(0, 1)
@@ -266,8 +266,8 @@ class Plot:
         ax.set_ylabel(scoring)
 
         # plt.title(f'Balanced accuracy per training example for {dataset_name} dataset', fontsize=26)
-        plt.plot(train_sizes, ssl_test_scores_mean, '-', color='#d7191c', label='SSL')
-        plt.plot(train_sizes, raw_test_scores_mean, '-', color='#2b83ba', label='FS')
+        plt.plot(train_sizes, ssl_test_scores_mean, '-', color='#117733', label='SSL')
+        plt.plot(train_sizes, raw_test_scores_mean, '-', color='#328', label='FS')
         # plt.legend(loc="best")
 
         self._plot(plt, 'learning_curves')
