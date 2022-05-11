@@ -110,7 +110,7 @@ class Plot:
             mask = y == i
             ax.scatter(components[mask, 0], components[mask, 1], s=1, alpha=0.4,
                     color=colors[i], label=stage)
-        ax.legend(markerscale=5, fontsize=15)
+        ax.legend(markerscale=10, fontsize=12)
 
         ax.set_title(f'PCA of {self.dataset_name} dataset')
 
@@ -132,7 +132,7 @@ class Plot:
             mask = y == i
             ax.scatter(components[mask, 0], components[mask, 1], s=1, alpha=0.4,
                     color=colors[i], label=stage)
-        ax.legend(markerscale=5, fontsize=15)
+        ax.legend(markerscale=10, fontsize=12)
 
         ax.set_title(f't-SNE of {self.dataset_name} dataset')
 
@@ -157,7 +157,7 @@ class Plot:
         plt.yticks([])
 
         colors = cm.get_cmap('plasma', n_stages)(range(n_stages))
-        # if annotating feature space with descriptions instead
+        # if annotating feature space with descriptions instesad
         if len(descriptions) > 0 or mapping is not None:
             annotations = mapping
             y = descriptions
@@ -165,7 +165,7 @@ class Plot:
             mask = y == i
             ax.scatter(umap_components[mask, 0], umap_components[mask, 1], s=1, alpha=0.4,
             color=colors[i], label=stage)
-        ax.legend(markerscale=5, fontsize=15)
+        ax.legend(markerscale=10, fontsize=12)
 
         ax.set_title(f'UMAP of {self.dataset_name} dataset')
 
