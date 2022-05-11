@@ -110,7 +110,7 @@ class Plot:
             mask = y == i
             ax.scatter(components[mask, 0], components[mask, 1], s=1, alpha=0.4,
                     color=colors[i], label=stage)
-        ax.legend(markerscale=2, fontsize=20)
+        ax.legend(markerscale=5, fontsize=15)
 
         ax.set_title(f'PCA of {self.dataset_name} dataset')
 
@@ -132,7 +132,7 @@ class Plot:
             mask = y == i
             ax.scatter(components[mask, 0], components[mask, 1], s=1, alpha=0.4,
                     color=colors[i], label=stage)
-        ax.legend(markerscale=2, fontsize=20)
+        ax.legend(markerscale=5, fontsize=15)
 
         ax.set_title(f't-SNE of {self.dataset_name} dataset')
 
@@ -165,7 +165,7 @@ class Plot:
             mask = y == i
             ax.scatter(umap_components[mask, 0], umap_components[mask, 1], s=1, alpha=0.4,
             color=colors[i], label=stage)
-        ax.legend(markerscale=2, fontsize=20)
+        ax.legend(markerscale=5, fontsize=15)
 
         ax.set_title(f'UMAP of {self.dataset_name} dataset')
 
