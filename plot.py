@@ -105,6 +105,14 @@ class Plot:
         n_stages = len(annotations)
 
         fig, ax = plt.subplots()
+
+        # remove top/right axis spines
+        ax.spines['right'].set_visible(False)
+        ax.spines['top'].set_visible(False)
+        # remove x/y tick labels
+        plt.xticks([])
+        plt.yticks([])
+
         colors = cm.get_cmap('plasma', n_stages)(range(n_stages))
         for i, stage in enumerate(annotations):
             mask = y == i
@@ -127,6 +135,14 @@ class Plot:
         n_stages = len(annotations)
 
         fig, ax = plt.subplots()
+
+        # remove top/right axis spines
+        ax.spines['right'].set_visible(False)
+        ax.spines['top'].set_visible(False)
+        # remove x/y tick labels
+        plt.xticks([])
+        plt.yticks([])
+
         colors = cm.get_cmap('plasma', n_stages)(range(n_stages))
         for i, stage in enumerate(annotations):
             mask = y == i
@@ -251,7 +267,7 @@ class Plot:
             ssl_test_scores_mean - ssl_test_scores_std,
             ssl_test_scores_mean + ssl_test_scores_std,
             alpha=0.1,
-            color="#117733",
+            color="r",
         )
         ax.fill_between(
             train_sizes,
@@ -266,7 +282,7 @@ class Plot:
         ax.set_ylabel(scoring)
 
         # plt.title(f'Balanced accuracy per training example for {dataset_name} dataset', fontsize=26)
-        plt.plot(train_sizes, ssl_test_scores_mean, '-', color='#117733', label='SSL')
+        plt.plot(train_sizes, ssl_test_scores_mean, '-', color='r', label='SSL')
         plt.plot(train_sizes, raw_test_scores_mean, '-', color='#328', label='FS')
         # plt.legend(loc="best")
 
